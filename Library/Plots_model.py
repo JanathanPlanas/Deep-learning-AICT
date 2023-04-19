@@ -4,6 +4,9 @@ import pandas as pd
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import RandomizedSearchCV
+from sklearn.preprocessing import MinMaxScaler
+
+mm = MinMaxScaler(feature_range=(0, 1))
 
 
 class Visualization:
@@ -52,10 +55,11 @@ class RandomizedSearchCVWrapper:
                                                random_state=random_state, n_jobs=n_jobs, scoring=scoring,
                                                verbose=verbose, return_train_score=return_train_score)
 
-        self.randomsearch.fit(X_train, y_train)
-        self.results = pd.DataFrame(self.randomsearch.cv_results_).sort_values(
+        self.random_fit = self.randomsearch.fit(
+            mm.fit_transform(X_train), y_train)
+        self.results = pd.DataFrame(self.random_fit.cv_results_).sort_values(
             "mean_test_score", ascending=False)
-        self.best_params = self.randomsearch.best_params_
+        self.best_params = self.random_fit.best_params_
 
     def plot_mean_performance(self):
 
