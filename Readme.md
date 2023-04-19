@@ -1,0 +1,1 @@
+Arquivos referentes as construções de modelos e métodos para classificação de espectros de sinais.ss
