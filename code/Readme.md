@@ -1,2 +1,0 @@
-Esse repositoriio se trata de uso e aplicações de modelos machine learning em radio frequencia com o objetivo final que o modelo identifique
-o espectro do sinal e atráves de uma aprendizado saiba diferenciar padrões de banda larga, rede wifi , 2.4 ghz, banda FM ( 88.1, 99.1, 99.8 e ruído )
