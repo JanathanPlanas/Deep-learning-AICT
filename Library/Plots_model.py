@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from sklearn.metrics import confusion_matrix
+
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.preprocessing import MinMaxScaler
 
@@ -17,23 +17,6 @@ class Visualization:
         counts = y_test.value_counts(normalize=True)
         counts.plot.pie(autopct="%0.2f%%")
         plt.show()
-
-    def confusion_matrix(self, model, X_train, X_test, y_train, y_test) -> None:
-
-        self.model = model
-        self.X_train = X_train
-        self.X_test = X_test
-        self.y_train = y_train
-        self.y_test = y_test
-
-        self.predict = (model).predict(X_test)
-
-        plt.figure(figsize=(16, 5))
-        sns.heatmap(confusion_matrix(
-            self.y_test, self.predict), annot=True)
-        plt.xlabel('Predicted')
-        plt.ylabel('Truth')
-
 
 class RandomizedSearchCVWrapper:
 
