@@ -1,124 +1,47 @@
 
+# Make device agnostic code
+from timeit import default_timer as timer
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from torch.utils.data import DataLoader, TensorDataset
-from helper_functions import accuracy_fn
 # Standard PyTorch imports
 import torch
+import torch.nn as nn
+import torch.optim as optimpip
+from helper_functions import accuracy_fn
+from mlxtend.plotting import plot_confusion_matrix
 from sklearn.metrics import (accuracy_score, classification_report,
                              confusion_matrix, f1_score, recall_score)
 from sklearn.model_selection import train_test_split
-
-import torch.optim as optim
-# Make device agnostic code
-from timeit import default_timer as timer
+from torch.utils.data import DataLoader, TensorDataset
+from torchmetrics import ConfusionMatrix
 # Import tqdm for progress bar
 from tqdm.auto import tqdm
-import torch.nn as nn
-from tqdm.auto import tqdm
-from torchmetrics import ConfusionMatrix
-from mlxtend.plotting import plot_confusion_matrix
-
-
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class TorchDataset():
 
-    def __init__(self, CLEAR, WIFI, LTE, reshape : bool, sliced:int, values_reshaped :int):
+    def __init__(self):
 
-
-        """
-     Initializes the TorchDatase class.
-     
-        """
-        self.CLEAR = CLEAR.ravel()[:sliced]
-        self.WIFI = WIFI.ravel()[:sliced]
-        self.LTE = LTE.ravel()[:sliced]
-        self.CNNModel = CNNModel(in_channels=values_reshaped)
-
-        if (len(CLEAR) == len(WIFI) == len(LTE) ) == False : # Validando que tamanho dos conjunto de dados
-             
-             raise ValueError("Dataset shape does not match {CLEAR.shape}")
-
-        elif reshape == True: # Tranformando o conjunto de dados pra 3 features
-
-
-            if((len(self.CLEAR) % 2 == 0) == False ):
-    
-                raise ValueError("Dataset size does not allow the reshape request {self.CLEAR} into shape 2")
-
-            self.WIFI_SINAL = pd.DataFrame(np.concatenate((WIFI[:sliced].real,
-                                                            WIFI[:sliced].imag),
-                                                            axis=1).reshape(-1,values_reshaped)).reset_index()
-            
-            self.CLEAR_SINAL = pd.DataFrame(np.concatenate((CLEAR[:sliced].real,
-                                                             CLEAR[:sliced].imag),
-                                                             axis=1).reshape(-1,values_reshaped)).reset_index()
-            
-            self.LTE_SINAL = pd.DataFrame(np.concatenate((LTE[:sliced].real, 
-                                                          LTE[:sliced].imag),
-                                                          axis=1).reshape(-1,values_reshaped)).reset_index()
-
-
-            self.CLEAR_SINAL['Label'] = "CLEAR"
-
-            self.WIFI_SINAL['Label'] = "WIFI"
-
-            self.LTE_SINAL['Label'] = "LTE"
-
-
-            self.reshaped= pd.concat([self.CLEAR_SINAL, self.WIFI_SINAL, self.LTE_SINAL], 
-                                  keys=[
-                                    f"CLEAR", f"WIFI", f"LTE"]).reset_index().rename(columns={'level_0': 'Signals',
-                                                                        'level_1': 'index'}).drop(columns=['index'])
-            
-            
-            self.reshaped['Label'] = (self.reshaped['Label']).map({'CLEAR':0,'WIFI':1, "LTE":2})
-        else:
-
-            real_1, imag_1 = np.real(self.CLEAR) , np.imag(self.CLEAR)
-            real_2, imag_2 = np.real(self.WIFI) , np.imag(self.WIFI)
-            real_3, imag_3 = np.real(self.LTE) , np.imag(self.LTE)
-                
-                
-            self.CLEAR = pd.DataFrame(real_1,
-                                            imag_1).reset_index().rename(columns={'index':"Real", 0: "Imag"})
-        
-            self.WIFI = pd.DataFrame(real_2,
-                                            imag_2).reset_index().rename(columns={'index': "Real",  0: "Imag"})
-
-            self.LTE = pd.DataFrame(real_3,
-                                            imag_3).reset_index().rename(columns={'index': "Real", 0: "Imag"})
-            
-            self.WIFI['Label'] = "WIFI"
-            self.CLEAR['Label'] = "CLEAR"
-            self.LTE['Label'] = "LTE"
-
-            self.dataframe= pd.concat([self.CLEAR, self.WIFI, self.LTE], keys=[
-                                    f"CLEAR", f"WIFI", f"LTE"]).reset_index().rename(columns={'level_0': 'Signals',
-                                                                        'level_1': 'index'}).drop(columns=['index'])
-            
-            self.dataframe['Label'] = (self.dataframe['Label']).map({'CLEAR':0,'WIFI':1, "LTE":2}) 
-
+        pass
 
     def Spliting(self,data,random_state, test_size , shuffle: bool) :
 
 
-            data = data.drop(columns ='Signals' )
-            X = data.iloc[:,:len(data.columns)-1]
-            y = data.iloc[:,len(data.columns)-1]
+            X = data[:, :-1]
+            y = data[:, -1]
                             
             X_train, X_test, y_train, y_test = train_test_split( X, y, 
                                                                 test_size=test_size, 
                                                                 random_state=random_state, shuffle = shuffle)
         
             
-            self.X_train= torch.tensor(X_train.values)
-            self.X_test= torch.tensor(X_test.values)
-            self.y_train= torch.tensor(y_train.values)
-            self.y_test= torch.tensor(y_test.values)
+            self.X_train= torch.tensor(X_train)
+            self.X_test= torch.tensor(X_test)
+            self.y_train= torch.tensor(y_train)
+            self.y_test= torch.tensor(y_test)
             
             return X_train, X_test, y_train, y_test
 
