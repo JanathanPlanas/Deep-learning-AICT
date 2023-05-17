@@ -43,10 +43,10 @@ class TorchDataset():
                 device: torch.device ,
                 epochs:int ):
         # loop pelo dataloader de treino
-
+        accuracy_metrics = []
         print(f"Training on {self.device}")
         for epoch in tqdm(range(epochs)):
-            print(f"Epoch: {epoch}\n---------")
+            print(f" Epoch: {epoch}\n---------")
             # loop pelo dataloader de treino
             model.to(device)
             model.train().double()
@@ -88,6 +88,7 @@ class TorchDataset():
             valid_loss = 0
             test_loss = 0
             test_accurary = 0
+            accuracy_list = []
             with torch.inference_mode():
                 
                 for data, target in data_loader_test:
@@ -107,6 +108,11 @@ class TorchDataset():
                 test_accurary /= len(data_loader_test)
                     
             print(f'Test loss: {valid_loss:.5f} | Test accuracy: {test_accurary:.2f}%')
+
+            accuracy_metrics.append(test_accurary)
+
+            self.accuracy_metrics = np.max(accuracy_metrics)
+
 
 
     def print_train_time(start: float, end: float, device: torch.device = 'cpu'):
@@ -133,7 +139,7 @@ class TorchDataset():
         y_preds = []
         model.eval()
         with torch.inference_mode():
-            for X, y in tqdm(data_loader, desc="Making predictions"):
+            for X, y in (data_loader):
                 # Send data and targets to target device
                 X, y = X.to(self.device), y.to(self.device)
 
@@ -210,6 +216,23 @@ class CNNModel(nn.Module):
                         nn.BatchNorm1d(256),
                         nn.Tanh(),
                         nn.Conv1d(in_channels=256,
+                        out_channels=128,
+                        kernel_size=2,
+                        padding=1,
+                        stride = 1),
+                        nn.BatchNorm1d(256),
+                        nn.Tanh(),
+                        nn.MaxPool1d(kernel_size=2) )
+        
+        self.layer4 = nn.Sequential(
+                        nn.Conv1d(in_channels=128,
+                        out_channels=256,
+                        kernel_size=3,
+                        padding=1,
+                        stride = 1),
+                        nn.BatchNorm1d(256),
+                        nn.Tanh(),
+                        nn.Conv1d(in_channels=256,
                         out_channels=256,
                         kernel_size=2,
                         padding=1,
@@ -237,6 +260,7 @@ class CNNModel(nn.Module):
         out = self.layer1(x)
         out = self.layer2(out)
         out = self.layer3(out)
+        out = self.layer4(out)
 
         out = out.view(out.size(0), -1)
         out = self.classifier(out)
@@ -246,16 +270,16 @@ class CNNModel(nn.Module):
         return out
     
 
-
 class Putting_All_Together():
 
     def Running(self):
 
-        Data_loader = DATA_1M(seconds=10,columns=2000, jump_time =5 , n_jumps=1)
+        Data_loader = DATA_1M(seconds=30,columns=4000, jump_time =0, n_jumps=1)
         Torch = TorchDataset(columns= Data_loader.loading_data().shape[1] -1)
 
-        Data_loader.Spliting(data= Data_loader.loading_data(), random_state= 42, test_size = 0.275, shuffle = True)
+        Data_loader.Spliting(data= Data_loader.loading_data(), random_state= 42, test_size = 0.275, shuffle = True, inplace= False)
         Data_loader.DataLoaders()
+
         Torch.training_loop(data_loader_train=Data_loader.train_dataloader,
         data_loader_test = Data_loader.test_dataloader,
                 model=Torch.modelCnnModel, 
@@ -264,7 +288,17 @@ class Putting_All_Together():
                 accuracy_fn=accuracy_fn,
                 device=Torch.device,
                 epochs = 5)
+        
+        print("Highest accuracy : ",Torch.accuracy_metrics)
 
+        
+
+        class_names = ['CLEAR','WIFI','LTE']
+        # confmat = ConfusionMatrix(num_classes=3, task='multiclass')
+        # confmat_tensor = confmat(preds=  Torch.Making_Predictions(model = Torch.modelCnnModel, data_loader= Data_loader.test_dataloader),
+        #                         target= Data_loader.y_test )
+        
+        print(classification_report(Data_loader.y_test, Torch.Making_Predictions(model = Torch.modelCnnModel, data_loader= Data_loader.test_dataloader),target_names=class_names))
 
 if __name__ =="__main__":
 

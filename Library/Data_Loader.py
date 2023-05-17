@@ -67,7 +67,7 @@ class DATA_1M():
 
         return np.concatenate(result, axis=0) # Putting all together
     
-    def Spliting(self ,data, random_state, test_size , shuffle : bool) :
+    def Spliting(self ,data, random_state, test_size , shuffle : bool, inplace : bool) :
 
 
             X = data[:, :-1]
@@ -99,8 +99,10 @@ class DATA_1M():
 
             print("Dataset : ", self.full_dataset.shape)
 
-            
-            return X_train, X_test, y_train, y_test
+            if inplace == True :
+                return X_train, X_test, y_train, y_test
+            else:
+                 pass
 
             # convertendo numpy arrays em tensores do PyTorch
     def DataLoaders(self,batch_size = 512):
