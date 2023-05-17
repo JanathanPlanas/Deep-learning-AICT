@@ -4,66 +4,37 @@ from timeit import default_timer as timer
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 # Standard PyTorch imports
 import torch
 import torch.nn as nn
-import torch.optim as optimpip
+from Data_Loader import DATA_1M
 from helper_functions import accuracy_fn
 from mlxtend.plotting import plot_confusion_matrix
 from sklearn.metrics import (accuracy_score, classification_report,
                              confusion_matrix, f1_score, recall_score)
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, TensorDataset
 from torchmetrics import ConfusionMatrix
 # Import tqdm for progress bar
 from tqdm.auto import tqdm
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class TorchDataset():
 
-    def __init__(self):
+    def __init__(self, columns):
 
-        pass
-
-    def Spliting(self,data,random_state, test_size , shuffle: bool) :
-
-
-            X = data[:, :-1]
-            y = data[:, -1]
-                            
-            X_train, X_test, y_train, y_test = train_test_split( X, y, 
-                                                                test_size=test_size, 
-                                                                random_state=random_state, shuffle = shuffle)
+        self.device = (torch.device('cuda') if torch.cuda.is_available()
+                      else torch.device('cpu'))
         
-            
-            self.X_train= torch.tensor(X_train)
-            self.X_test= torch.tensor(X_test)
-            self.y_train= torch.tensor(y_train)
-            self.y_test= torch.tensor(y_test)
-            
-            return X_train, X_test, y_train, y_test
-
-            # convertendo numpy arrays em tensores do PyTorch
-    def DataLoaders(self,batch_size):
-
-            # criando datasets
-        self.train_dataset = TensorDataset(self.X_train, self.y_train)
-        self.test_dataset = TensorDataset(self.X_test , self.y_test)
-
-            # criando dataloaders 
-        train_dataloader = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True)
-        test_dataloader = DataLoader(self.test_dataset, batch_size=batch_size, shuffle=False)
-                    
-
-        return  train_dataloader,  test_dataloader
-    
+        self.modelCnnModel = CNNModel(in_channels= columns)
+        
+        self.loss_fn = nn.CrossEntropyLoss()
+        self.optimizer = torch.optim.SGD(self.modelCnnModel.parameters(), lr=0.03)
+        
 
 # carregando o modelo
 
    
-    def train_step(self, model: torch.nn.Module,
+    def training_loop(self, model: torch.nn.Module,
                 data_loader_train: torch.utils.data.DataLoader,
                 data_loader_test: torch.utils.data.DataLoader,
                 loss_fn: torch.nn.Module,
@@ -73,20 +44,21 @@ class TorchDataset():
                 epochs:int ):
         # loop pelo dataloader de treino
 
+        print(f"Training on {self.device}")
         for epoch in tqdm(range(epochs)):
             print(f"Epoch: {epoch}\n---------")
             # loop pelo dataloader de treino
             model.to(device)
-            model.train()
+            model.train().double()
             training_loss= 0
             training_accurary = 0
             valid_loss = 0
             for batch, (inputs, target) in enumerate(data_loader_train):
                 # movendo os dados para o dispositivo de processamento
-                inputs = inputs.to(device)
-                inputs = inputs.unsqueeze(2)
+                inputs = inputs.to(device).double()
+                inputs = inputs.unsqueeze(2 )
                 # fazendo as previsões
-                output = model(inputs)
+                output = model(inputs.double())
                 
                 # calculando a perda
                 loss = loss_fn(output, target.long())
@@ -112,7 +84,7 @@ class TorchDataset():
         # avaliando o modelo no dataloard de teste
                 # loop pelo dataloader de teste
 
-            model.eval()
+            model.eval().double()
             valid_loss = 0
             test_loss = 0
             test_accurary = 0
@@ -137,7 +109,7 @@ class TorchDataset():
             print(f'Test loss: {valid_loss:.5f} | Test accuracy: {test_accurary:.2f}%')
 
 
-    def print_train_time(start: float, end: float, device: torch.device = device):
+    def print_train_time(start: float, end: float, device: torch.device = 'cpu'):
         """Prints difference between start and end time.
 
         Args:
@@ -163,7 +135,7 @@ class TorchDataset():
         with torch.inference_mode():
             for X, y in tqdm(data_loader, desc="Making predictions"):
                 # Send data and targets to target device
-                X, y = X.to(device), y.to(device)
+                X, y = X.to(self.device), y.to(self.device)
 
                 X = X.unsqueeze(2)
                 # Do the forward pass
@@ -191,7 +163,7 @@ class TorchDataset():
             conf_mat=confmat_tensor.numpy(), # matplotlib likes working with NumPy 
             class_names=class_names, # turn the row and column labels into class names
             figsize=(10, 7) )
-
+        plt.show()
 
 
 
@@ -258,7 +230,6 @@ class CNNModel(nn.Module):
             nn.LogSoftmax(dim=1)
 
             )
-        
  
         
     def forward(self, x):
@@ -276,7 +247,25 @@ class CNNModel(nn.Module):
     
 
 
+class Putting_All_Together():
+
+    def Running(self):
+
+        Data_loader = DATA_1M(seconds=10,columns=2000, jump_time =5 , n_jumps=1)
+        Torch = TorchDataset(columns= Data_loader.loading_data().shape[1] -1)
+
+        Data_loader.Spliting(data= Data_loader.loading_data(), random_state= 42, test_size = 0.275, shuffle = True)
+        Data_loader.DataLoaders()
+        Torch.training_loop(data_loader_train=Data_loader.train_dataloader,
+        data_loader_test = Data_loader.test_dataloader,
+                model=Torch.modelCnnModel, 
+                loss_fn=Torch.loss_fn,
+                optimizer=Torch.optimizer,
+                accuracy_fn=accuracy_fn,
+                device=Torch.device,
+                epochs = 5)
 
 
-    
+if __name__ =="__main__":
 
+    Putting_All_Together().Running()
