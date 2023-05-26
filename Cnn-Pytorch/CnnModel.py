@@ -1,4 +1,3 @@
-
 # Make device agnostic code
 from dataclasses import dataclass
 from timeit import default_timer as timer
@@ -41,6 +40,8 @@ class NeuralNetCNN():
                        else torch.device('cpu'))
 
         self.Cnn = Classifier(in_channels_columns=columns)
+        self.ExtenderClassifier = ExtendedClassifier(
+            in_channels_columns=columns)
 
         self.loss_fn = nn.CrossEntropyLoss()
 
@@ -54,9 +55,7 @@ class NeuralNetCNN():
 
         self.loss_fn = value
 
-
-# carregando o modelo e fazendo automatica os prints do treino e teste de acurácia de loss functions
-
+    # carregando o modelo e fazendo automatica os prints do treino e teste de acurácia de loss functions
 
     def training_loop(self, model: torch.nn.Module,
                       data_loader_train: torch.utils.data.DataLoader,
@@ -108,10 +107,10 @@ class NeuralNetCNN():
             print(
                 f'Train loss: {training_loss:.5f} | Train accuracy: {training_accurary:.2f}%')
 
-            results_array_train[epoch, 0] = training_loss
-            results_array_train[epoch, 1] = training_accurary
+            results_array_train[epoch, 0] = "%.2f" % training_loss
+            results_array_train[epoch, 1] = "%.2f" % training_accurary
 
-        # avaliando o modelo no dataloard de teste
+            # avaliando o modelo no dataloard de teste
             # loop pelo dataloader de teste
 
             model.eval().double()
@@ -141,8 +140,8 @@ class NeuralNetCNN():
             print(
                 f'Test loss: {valid_loss:.5f} | Test accuracy: {test_accurary:.2f}%')
 
-            results_array_test[:, 0] = valid_loss
-            results_array_test[:, 1] = test_accurary
+            results_array_test[epoch, 0] = "%.2f" % valid_loss
+            results_array_test[epoch, 1] = "%.2f" % test_accurary
 
         self.test_acc = results_array_test[:, 1]
         self.tess_loss = results_array_test[:, 0]
@@ -158,7 +157,6 @@ class NeuralNetCNN():
     def __call__(self, train: bool, test: bool) -> Any:
 
         if train == True and test == True:
-
             return pd.DataFrame({
                 "Test Accuracy": self.test_acc,
                 "Test Loss ": self.tess_loss,
@@ -241,6 +239,10 @@ class ConvBlock(nn.Module):
                       kernel_size=2, padding=1, stride=1),
             nn.BatchNorm1d(out_channels),
             nn.ReLU(),
+            nn.Conv1d(out_channels, out_channels,
+                      kernel_size=2, padding=1, stride=1),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU()
         )
         self.conv2 = nn.Sequential(
             nn.Conv1d(out_channels, out_channels,
@@ -248,6 +250,11 @@ class ConvBlock(nn.Module):
             nn.BatchNorm1d(out_channels),
             nn.Tanh(),
             nn.MaxPool1d(kernel_size=2),
+            nn.Conv1d(out_channels, out_channels,
+                      kernel_size=2, padding=1, stride=1),
+            nn.BatchNorm1d(out_channels),
+            nn.Tanh(),
+            nn.MaxPool1d(kernel_size=2)
         )
 
     def forward(self, x):
@@ -261,25 +268,24 @@ class Classifier(nn.Module):
         super().__init__()
 
         self.conv = nn.Sequential(
-            ConvBlock(in_channels=in_channels_columns, out_channels=64),
-            ConvBlock(in_channels=64, out_channels=128),
-            # ConvBlock(in_channels=128, out_channels=256),
+            ConvBlock(in_channels=in_channels_columns, out_channels=32),
+            ConvBlock(in_channels=32, out_channels=48),
+            ConvBlock(in_channels=48, out_channels=64),
             # ConvBlock(in_channels=256, out_channels=512),
         )
 
         self.classifier = nn.Sequential(
             #             nn.Dropout(0.2),
-            nn.BatchNorm1d(128),
-            nn.Linear(128, 64),
-            nn.ReLU(),
             nn.BatchNorm1d(64),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.BatchNorm1d(32),
             #             nn.Dropout(0.2),
-            nn.Linear(64, 4),
+            nn.Linear(32, 3),
             nn.LogSoftmax(dim=1)
         )
 
     def forward(self, x):
-
         out = self.conv(x)
 
         out = out.view(out.size(0), -1)
@@ -289,10 +295,28 @@ class Classifier(nn.Module):
         return out
 
 
+class ExtendedClassifier(Classifier):
+    def __init__(self, in_channels_columns):
+        super().__init__(in_channels_columns)  # Chama o construtor da classe pai
+
+        # Adiciona um novo ConvBlock à sequência de convolução existente
+        self.conv = nn.Sequential(
+            *self.conv,  # Mantém os ConvBlocks existentes
+            # Novo ConvBlock adicionado
+            ConvBlock(in_channels=256, out_channels=256)
+        )
+
+        # Adiciona camadas adicionais ao classificador existente
+        self.classifier = nn.Sequential(
+            *self.classifier,  # Mantém as camadas existentes
+            # Exemplo de nova camada linear adicionada
+            nn.ReLU()
+        )
+
+
 class Putting_All_Together():
 
     def Running(self):
-
         Data_loader = DATA_1M(seconds=5, columns=2000, jump_time=10, n_jumps=1)
         Torch = NeuralNetCNN(columns=Data_loader(Fourier=True).shape[1] - 1)
 
@@ -322,7 +346,6 @@ class Putting_All_Together():
 
 
 if __name__ == "__main__":
-
     data = DATA_1M(seconds=5, columns=2000, jump_time=10, n_jumps=1)
     Torch = NeuralNetCNN(columns=data(Fourier=True).shape[1] - 1)
 
@@ -349,7 +372,6 @@ if __name__ == "__main__":
 
     print(classification_report(data.y_test, Torch.Making_Predictions(
         model=Torch.Cnn, data_loader=test_dataloader), target_names=class_names))
-
 
 # class CNNModel(nn.Module):
 
@@ -432,16 +454,16 @@ if __name__ == "__main__":
 
 #             )
 
-    # def forward(self, x):
+# def forward(self, x):
 
-    #     out = self.layer1(x)
-    #     out = self.layer2(out)
-    #     out = self.layer3(out)
-    #     out = self.layer4(out)
+#     out = self.layer1(x)
+#     out = self.layer2(out)
+#     out = self.layer3(out)
+#     out = self.layer4(out)
 
-    #     out = out.view(out.size(0), -1)
-    #     out = self.classifier(out)
+#     out = out.view(out.size(0), -1)
+#     out = self.classifier(out)
 
-    #     out = nn.functional.softmax(out, dim=1)
+#     out = nn.functional.softmax(out, dim=1)
 
-    #     return out
+#     return out

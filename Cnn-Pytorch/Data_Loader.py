@@ -1,5 +1,8 @@
 
+from typing import Any
+
 import numpy as np
+import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
@@ -22,6 +25,10 @@ class DATA_1M():
         self.signal = list(map(lambda x: (np.load(
             f"C:/Users/janat/OneDrive/Documentos/GitHub/Data_/{x}")), data))  # Data load
 
+        self.clear = self.signal[0]
+        self.wifi = self.signal[1]
+        self.lte = self.signal[2]
+
         # transformando os parametros de segundos para número de linhas
         self.row = int(
             np.round((self.sec*(self.signal[0].shape[0]) / (60)) / columns)*columns)
@@ -37,6 +44,46 @@ class DATA_1M():
         self.row = value  # setar os valor de linhas quando o usuario quiser
 
     # objeto Call usado para escolher se o dataset terá ou não transformada de Fourier
+
+    def __getattribute__(self, item):
+        if item == 'clear':
+            print(
+                """shape array {},\n
+                array {} \n  
+                memory usage {} MB""".format(
+                    object.__getattribute__(self, item).shape,
+                    object.__getattribute__(self, item),
+                    "%.2f" % (object.__getattribute__(
+                        self, item).nbytes / (1024 ** 2))
+                )
+            )
+
+        if item == 'lte':
+            print(
+                """shape array {},\n
+                array {} \n  
+                memory usage {} MB""".format(
+                    object.__getattribute__(self, item).shape,
+                    object.__getattribute__(self, item),
+                    "%.2f" % (object.__getattribute__(
+                        self, item).nbytes / (1024 ** 2))
+                )
+            )
+
+        if item == 'wifi':
+            print(
+                """shape array {},\n
+                array {} \n  
+                memory usage {} MB""".format(
+                    object.__getattribute__(self, item).shape,
+                    object.__getattribute__(self, item),
+                    "%.2f" % (object.__getattribute__(
+                        self, item).nbytes / (1024 ** 2))
+                )
+            )
+        else:
+            return object.__getattribute__(self, item)
+
     def __call__(self, Fourier=False):
 
         if Fourier == True:
@@ -84,7 +131,7 @@ class DATA_1M():
         self.full_dataset = np.concatenate(result, axis=0)
 
         print(
-            f"tamanho da memória ocupada :{self.full_dataset.nbytes/1024**2:.f} MB ")
+            f"tamanho da memória ocupada :{self.full_dataset.nbytes/(1024**2):.2f} MB")
 
         return np.concatenate(result, axis=0)
 
@@ -109,10 +156,10 @@ class DATA_1M():
         print("y_test shape:", y_test.shape, y_train.dtype)
         print("\n--------")
 
-        print("X_train device:", X_train.device)
-        print("X_Test device:", X_test.device)
-        print("y_train device:", y_train.device)
-        print("y_test device:", y_test.device)
+        print("X_train device:", self.X_train.device)
+        print("X_Test device:", self.X_test.device)
+        print("y_train device:", self.y_train.device)
+        print("y_test device:", self.y_test.device)
 
         arr_non_negative = y.astype('int64') - np.min(y.astype('int64'))
     # Calcular a contagem de cada valor
