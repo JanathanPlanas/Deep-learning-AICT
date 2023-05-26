@@ -31,6 +31,8 @@ class NeuralNetCNN():
     -> print_train_time
     -> Making predictions
     -> print confusion matrix
+    -> print classification report
+    -> print accuracy
 
     """
 
@@ -45,7 +47,7 @@ class NeuralNetCNN():
 
         self.loss_fn = nn.CrossEntropyLoss()
 
-        self.optimizer = torch.optim.SGD(self.Cnn.parameters(), lr=0.01)
+        self.optimizer = torch.optim.SGD(self.Cnn.parameters(), lr=0.0125)
 
     def __str__(self) -> str:
 
@@ -346,13 +348,16 @@ class Putting_All_Together():
 
 
 if __name__ == "__main__":
-    data = DATA_1M(seconds=5, columns=2000, jump_time=10, n_jumps=1)
-    Torch = NeuralNetCNN(columns=data(Fourier=True).shape[1] - 1)
 
-    data.Spliting(data=data(Fourier=True), random_state=42,
-                  test_size=0.275, shuffle=True, inplace=False)
+    data = DATA_1M(seconds=5, columns=128, jump_time=10, n_jumps=1)
+    data_fourier = data(Fourier=True, Normalizing=True)
+    Torch = NeuralNetCNN(columns=data_fourier.shape[1] - 1)
+
+    data.Spliting(data=data_fourier, random_state=38,
+                  test_size=0.25, shuffle=True, inplace=False)
+
     train_dataloader, test_dataloader = data.DataLoaders(
-        batch_size=256, inplace=True)
+        batch_size=32, inplace=True)
 
     Torch.training_loop(data_loader_train=train_dataloader,
                         data_loader_test=test_dataloader,
@@ -361,7 +366,7 @@ if __name__ == "__main__":
                         optimizer=Torch.optimizer,
                         accuracy_fn=accuracy_fn,
                         device=Torch.device,
-                        epochs=5)
+                        epochs=10)
 
     print(Torch(test=True, train=True))
 

@@ -4,6 +4,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import torch
+from helper_functions import normalize
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -49,7 +50,7 @@ class DATA_1M():
         if item == 'clear':
             print(
                 """shape array {},\n
-                array {} \n  
+                Clear array \n {} \n  
                 memory usage {} MB""".format(
                     object.__getattribute__(self, item).shape,
                     object.__getattribute__(self, item),
@@ -58,10 +59,10 @@ class DATA_1M():
                 )
             )
 
-        if item == 'lte':
+        elif item == 'lte':
             print(
                 """shape array {},\n
-                array {} \n  
+                LTE array \n{} \n  
                 memory usage {} MB""".format(
                     object.__getattribute__(self, item).shape,
                     object.__getattribute__(self, item),
@@ -70,10 +71,10 @@ class DATA_1M():
                 )
             )
 
-        if item == 'wifi':
+        elif item == 'wifi':
             print(
                 """shape array {},\n
-                array {} \n  
+               WIFI array \n {} \n  
                 memory usage {} MB""".format(
                     object.__getattribute__(self, item).shape,
                     object.__getattribute__(self, item),
@@ -84,9 +85,9 @@ class DATA_1M():
         else:
             return object.__getattribute__(self, item)
 
-    def __call__(self, Fourier=False):
+    def __call__(self, Fourier=False, Normalizing=False):
 
-        if Fourier == True:
+        if Fourier == True and Normalizing == True:
 
             """
             Retorna o dateframe apos a Tranformada de Fourier.
@@ -95,21 +96,52 @@ class DATA_1M():
             empyt_list = list(map(lambda x: [np.fft.fftn(x[self.jump_time_rows:self.jump_time_rows+int(self.row/self.n_jumps)]) for i in range(self.n_jumps)],
 
                                   self.signal))  # Aplicando a transformada de Fourier
-            # Slicing data
-        else:
-            empyt_list = []           # Não aplicando a Transformada de Fourier
 
+            clear, lte, wifi = map(lambda x:  np.concatenate((np.real(x).reshape(-1, 1), np.imag(
+                x).reshape(-1, 1)), axis=1), empyt_list[:3])  # Spliting the real and imaginary numbers
+
+            clear = normalize(data=clear)
+            lte = normalize(data=lte)
+            wifi = normalize(data=wifi)
+
+            samples_signal = [clear, lte, wifi]
+
+            signal_list = list(map(lambda x: np.hstack(
+                x).reshape(-1, self.values_reshaped), samples_signal))
+            # Reshaping data            # Slicing data
+        elif Fourier == False and Normalizing == True:
+
+            empyt_list = []
             empyt_list = list(map(lambda x: [(x[self.jump_time_rows:self.jump_time_rows+int(self.row/self.n_jumps)]) for i in range(self.n_jumps)],
 
-                                  self.signal))  # Slicing data
+                                  self.signal))  # Aplicando a transformada de Fourier
 
-        clear, lte, wifi = map(lambda x: np.concatenate((np.real(x).reshape(-1, 1), np.imag(
-            x).reshape(-1, 1)), axis=1), empyt_list[:3])  # Spliting the real and imaginary numbers
+            clear, lte, wifi = map(lambda x:  np.concatenate((np.real(x).reshape(-1, 1), np.imag(
+                x).reshape(-1, 1)), axis=1), empyt_list[:3])  # Spliting the real and imaginary numbers
 
-        samples_signal = [clear, lte, wifi]
+            clear = normalize(data=clear)
+            lte = normalize(data=lte)
+            wifi = normalize(data=wifi)
 
-        signal_list = list(map(lambda x: np.hstack(
-            x).reshape(-1, self.values_reshaped), samples_signal))  # Reshaping data
+            samples_signal = [clear, lte, wifi]
+
+            signal_list = list(map(lambda x: np.hstack(
+                x).reshape(-1, self.values_reshaped), samples_signal))
+
+        elif Fourier == True and Normalizing == False:
+
+            empyt_list = []
+            empyt_list = list(map(lambda x: [np.fft.fftn(x[self.jump_time_rows:self.jump_time_rows+int(self.row/self.n_jumps)]) for i in range(self.n_jumps)],
+
+                                  self.signal))  # Aplicando a transformada de Fourier
+
+            clear, lte, wifi = map(lambda x:  np.concatenate((np.real(x).reshape(-1, 1), np.imag(
+                x).reshape(-1, 1)), axis=1), empyt_list[:3])  # Spliting the real and imaginary numbers
+
+            samples_signal = [clear, lte, wifi]
+
+            signal_list = list(map(lambda x: np.hstack(
+                x).reshape(-1, self.values_reshaped), samples_signal))    # Slicing data
 
         # Creating labels  0 - CLEAR , 1 - WIFI - 2 LTE
         result = []
@@ -145,7 +177,7 @@ class DATA_1M():
                                                             random_state=random_state, shuffle=shuffle)
 
         # Convertendos os arrays para tensor e passando para device setadi
-        self.X_train = (torch.tensor(X_train)).to(device)
+        self.X_train = torch.tensor(X_train).to(device)
         self.X_test = torch.tensor(X_test).to(device)
         self.y_train = torch.tensor(y_train).to(device)
         self.y_test = torch.tensor(y_test).to(device)
@@ -192,7 +224,7 @@ class DATA_1M():
 
         X, y = next(iter(self.train_dataloader))
         # Visualizar o shape do dataloader target e treino
-        print(X.shape, y.shape)
+        print(f"X {X.shape} y {y.shape}")
         print("----------------\n")
 
         print(f"Dataloaders: {self.train_dataloader, self.test_dataloader}")
