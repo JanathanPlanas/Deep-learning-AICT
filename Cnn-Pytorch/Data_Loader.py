@@ -40,11 +40,21 @@ class DATA_1M():
     def __str__(self) -> str:
         return f"Número de linhas {self.row}, equivalente a {self.sec} segundos \n Pulando em {self.jump} segundos em {self.n_jumps} vezes"
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, value):
 
         self.row = value  # setar os valor de linhas quando o usuario quiser
 
     # objeto Call usado para escolher se o dataset terá ou não transformada de Fourier
+
+    def get_clear(self):
+
+        return self.clear
+
+    def get_wifi(self):
+        return self.wifi
+
+    def get_lte(self):
+        return self.lte
 
     def __getattribute__(self, item):
         if item == 'clear':
@@ -97,15 +107,18 @@ class DATA_1M():
 
                                   self.signal))  # Aplicando a transformada de Fourier
 
+            # SEPARANDO REAL E IMAG
             clear, lte, wifi = map(lambda x:  np.concatenate((np.real(x).reshape(-1, 1), np.imag(
-                x).reshape(-1, 1)), axis=1), empyt_list[:3])  # Spliting the real and imaginary numbers
+                x).reshape(-1, 1)), axis=1), empyt_list[:3])
 
+            # APLICANDO NORMALIZAÇÃO
             clear = normalize(data=clear)
             lte = normalize(data=lte)
             wifi = normalize(data=wifi)
 
             samples_signal = [clear, lte, wifi]
 
+            # RESHAPE DOS DADOS
             signal_list = list(map(lambda x: np.hstack(
                 x).reshape(-1, self.values_reshaped), samples_signal))
             # Reshaping data            # Slicing data
