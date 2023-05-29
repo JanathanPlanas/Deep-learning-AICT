@@ -1,4 +1,7 @@
+<<<<<<< HEAD
+=======
 
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
 # Make device agnostic code
 from dataclasses import dataclass
 from timeit import default_timer as timer
@@ -11,6 +14,7 @@ import pandas as pd
 # Standard PyTorch importspip
 import torch
 import torch.nn as nn
+import torch.optim as optim
 from Data_Loader import DATA_1M
 from helper_functions import accuracy_fn
 from mlxtend.plotting import plot_confusion_matrix
@@ -32,6 +36,11 @@ class NeuralNetCNN():
     -> print_train_time
     -> Making predictions
     -> print confusion matrix
+<<<<<<< HEAD
+    -> print classification report
+    -> print accuracy
+=======
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
 
     """
 
@@ -41,10 +50,23 @@ class NeuralNetCNN():
                        else torch.device('cpu'))
 
         self.Cnn = Classifier(in_channels_columns=columns)
+<<<<<<< HEAD
+        self.ExtenderClassifier = ExtendedClassifier(
+            in_channels_columns=columns)
+
+        self.loss_fn = nn.CrossEntropyLoss()
+
+<<<<<<< HEAD
+        self.optimizer = torch.optim.SGD(self.Cnn.parameters(), lr=0.0125)
+=======
 
         self.loss_fn = nn.CrossEntropyLoss()
 
         self.optimizer = torch.optim.SGD(self.Cnn.parameters(), lr=0.01)
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
+=======
+        self.optimizer = torch.optim.Adam(self.Cnn.parameters(), lr=0.0125)
+>>>>>>> f6621a649ac70af710810e743c958e86ffd5ea80
 
     def __str__(self) -> str:
 
@@ -54,9 +76,13 @@ class NeuralNetCNN():
 
         self.loss_fn = value
 
+<<<<<<< HEAD
+    # carregando o modelo e fazendo automatica os prints do treino e teste de acurácia de loss functions
+=======
 
 # carregando o modelo e fazendo automatica os prints do treino e teste de acurácia de loss functions
 
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
 
     def training_loop(self, model: torch.nn.Module,
                       data_loader_train: torch.utils.data.DataLoader,
@@ -108,10 +134,17 @@ class NeuralNetCNN():
             print(
                 f'Train loss: {training_loss:.5f} | Train accuracy: {training_accurary:.2f}%')
 
+<<<<<<< HEAD
+            results_array_train[epoch, 0] = "%.2f" % training_loss
+            results_array_train[epoch, 1] = "%.2f" % training_accurary
+
+            # avaliando o modelo no dataloard de teste
+=======
             results_array_train[epoch, 0] = training_loss
             results_array_train[epoch, 1] = training_accurary
 
         # avaliando o modelo no dataloard de teste
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
             # loop pelo dataloader de teste
 
             model.eval().double()
@@ -141,8 +174,13 @@ class NeuralNetCNN():
             print(
                 f'Test loss: {valid_loss:.5f} | Test accuracy: {test_accurary:.2f}%')
 
+<<<<<<< HEAD
+            results_array_test[epoch, 0] = "%.2f" % valid_loss
+            results_array_test[epoch, 1] = "%.2f" % test_accurary
+=======
             results_array_test[:, 0] = valid_loss
             results_array_test[:, 1] = test_accurary
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
 
         self.test_acc = results_array_test[:, 1]
         self.tess_loss = results_array_test[:, 0]
@@ -158,7 +196,10 @@ class NeuralNetCNN():
     def __call__(self, train: bool, test: bool) -> Any:
 
         if train == True and test == True:
+<<<<<<< HEAD
+=======
 
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
             return pd.DataFrame({
                 "Test Accuracy": self.test_acc,
                 "Test Loss ": self.tess_loss,
@@ -241,6 +282,13 @@ class ConvBlock(nn.Module):
                       kernel_size=2, padding=1, stride=1),
             nn.BatchNorm1d(out_channels),
             nn.ReLU(),
+<<<<<<< HEAD
+            nn.Conv1d(out_channels, out_channels,
+                      kernel_size=2, padding=1, stride=1),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU()
+=======
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
         )
         self.conv2 = nn.Sequential(
             nn.Conv1d(out_channels, out_channels,
@@ -248,6 +296,14 @@ class ConvBlock(nn.Module):
             nn.BatchNorm1d(out_channels),
             nn.Tanh(),
             nn.MaxPool1d(kernel_size=2),
+<<<<<<< HEAD
+            nn.Conv1d(out_channels, out_channels,
+                      kernel_size=2, padding=1, stride=1),
+            nn.BatchNorm1d(out_channels),
+            nn.Tanh(),
+            nn.MaxPool1d(kernel_size=2)
+=======
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
         )
 
     def forward(self, x):
@@ -261,25 +317,43 @@ class Classifier(nn.Module):
         super().__init__()
 
         self.conv = nn.Sequential(
+<<<<<<< HEAD
+            ConvBlock(in_channels=in_channels_columns, out_channels=32),
+            ConvBlock(in_channels=32, out_channels=48),
+            ConvBlock(in_channels=48, out_channels=64),
+=======
             ConvBlock(in_channels=in_channels_columns, out_channels=64),
             ConvBlock(in_channels=64, out_channels=128),
             # ConvBlock(in_channels=128, out_channels=256),
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
             # ConvBlock(in_channels=256, out_channels=512),
         )
 
         self.classifier = nn.Sequential(
             #             nn.Dropout(0.2),
+<<<<<<< HEAD
+            nn.BatchNorm1d(64),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.BatchNorm1d(32),
+            #             nn.Dropout(0.2),
+            nn.Linear(32, 3),
+=======
             nn.BatchNorm1d(128),
             nn.Linear(128, 64),
             nn.ReLU(),
             nn.BatchNorm1d(64),
             #             nn.Dropout(0.2),
             nn.Linear(64, 4),
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
             nn.LogSoftmax(dim=1)
         )
 
     def forward(self, x):
+<<<<<<< HEAD
+=======
 
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
         out = self.conv(x)
 
         out = out.view(out.size(0), -1)
@@ -289,10 +363,35 @@ class Classifier(nn.Module):
         return out
 
 
+<<<<<<< HEAD
+class ExtendedClassifier(Classifier):
+    def __init__(self, in_channels_columns):
+        super().__init__(in_channels_columns)  # Chama o construtor da classe pai
+
+        # Adiciona um novo ConvBlock à sequência de convolução existente
+        self.conv = nn.Sequential(
+            *self.conv,  # Mantém os ConvBlocks existentes
+            # Novo ConvBlock adicionado
+            ConvBlock(in_channels=256, out_channels=256)
+        )
+
+        # Adiciona camadas adicionais ao classificador existente
+        self.classifier = nn.Sequential(
+            *self.classifier,  # Mantém as camadas existentes
+            # Exemplo de nova camada linear adicionada
+            nn.ReLU()
+        )
+
+
+class Putting_All_Together():
+
+    def Running(self):
+=======
 class Putting_All_Together():
 
     def Running(self):
 
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
         Data_loader = DATA_1M(seconds=5, columns=2000, jump_time=10, n_jumps=1)
         Torch = NeuralNetCNN(columns=Data_loader(Fourier=True).shape[1] - 1)
 
@@ -323,6 +422,17 @@ class Putting_All_Together():
 
 if __name__ == "__main__":
 
+<<<<<<< HEAD
+    data = DATA_1M(seconds=5, columns=128, jump_time=10, n_jumps=1)
+    data_fourier = data(Fourier=True, Normalizing=True)
+    Torch = NeuralNetCNN(columns=data_fourier.shape[1] - 1)
+
+    data.Spliting(data=data_fourier, random_state=38,
+                  test_size=0.25, shuffle=True, inplace=False)
+
+    train_dataloader, test_dataloader = data.DataLoaders(
+        batch_size=32, inplace=True)
+=======
     data = DATA_1M(seconds=5, columns=2000, jump_time=10, n_jumps=1)
     Torch = NeuralNetCNN(columns=data(Fourier=True).shape[1] - 1)
 
@@ -330,6 +440,7 @@ if __name__ == "__main__":
                   test_size=0.275, shuffle=True, inplace=False)
     train_dataloader, test_dataloader = data.DataLoaders(
         batch_size=256, inplace=True)
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
 
     Torch.training_loop(data_loader_train=train_dataloader,
                         data_loader_test=test_dataloader,
@@ -338,7 +449,11 @@ if __name__ == "__main__":
                         optimizer=Torch.optimizer,
                         accuracy_fn=accuracy_fn,
                         device=Torch.device,
+<<<<<<< HEAD
+                        epochs=10)
+=======
                         epochs=5)
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
 
     print(Torch(test=True, train=True))
 
@@ -350,7 +465,10 @@ if __name__ == "__main__":
     print(classification_report(data.y_test, Torch.Making_Predictions(
         model=Torch.Cnn, data_loader=test_dataloader), target_names=class_names))
 
+<<<<<<< HEAD
+=======
 
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
 # class CNNModel(nn.Module):
 
 #     def __init__(self,in_channels):
@@ -432,6 +550,21 @@ if __name__ == "__main__":
 
 #             )
 
+<<<<<<< HEAD
+# def forward(self, x):
+
+#     out = self.layer1(x)
+#     out = self.layer2(out)
+#     out = self.layer3(out)
+#     out = self.layer4(out)
+
+#     out = out.view(out.size(0), -1)
+#     out = self.classifier(out)
+
+#     out = nn.functional.softmax(out, dim=1)
+
+#     return out
+=======
     # def forward(self, x):
 
     #     out = self.layer1(x)
@@ -445,3 +578,4 @@ if __name__ == "__main__":
     #     out = nn.functional.softmax(out, dim=1)
 
     #     return out
+>>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
