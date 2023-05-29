@@ -14,6 +14,7 @@ import pandas as pd
 # Standard PyTorch importspip
 import torch
 import torch.nn as nn
+import torch.optim as optim
 from Data_Loader import DATA_1M
 from helper_functions import accuracy_fn
 from mlxtend.plotting import plot_confusion_matrix
@@ -55,6 +56,7 @@ class NeuralNetCNN():
 
         self.loss_fn = nn.CrossEntropyLoss()
 
+<<<<<<< HEAD
         self.optimizer = torch.optim.SGD(self.Cnn.parameters(), lr=0.0125)
 =======
 
@@ -62,6 +64,9 @@ class NeuralNetCNN():
 
         self.optimizer = torch.optim.SGD(self.Cnn.parameters(), lr=0.01)
 >>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
+=======
+        self.optimizer = torch.optim.Adam(self.Cnn.parameters(), lr=0.0125)
+>>>>>>> f6621a649ac70af710810e743c958e86ffd5ea80
 
     def __str__(self) -> str:
 
