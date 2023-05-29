@@ -1,15 +1,10 @@
 
-<<<<<<< HEAD
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import torch
 from helper_functions import normalize
-=======
-import numpy as np
-import torch
->>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -29,15 +24,12 @@ class DATA_1M():
 
         data = ['Clear.npy', 'WIFI_1M.npy', 'LTE_1M.npy']
         self.signal = list(map(lambda x: (np.load(
-            f"C:/Users/janat/OneDrive/Documentos/GitHub/Data_/{x}")), data))  # Data load
+            f"C:/Users/janathan.pena/Documents/GitHub/{x}")), data))  # Data load
 
-<<<<<<< HEAD
         self.clear = self.signal[0]
         self.wifi = self.signal[1]
         self.lte = self.signal[2]
 
-=======
->>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
         # transformando os parametros de segundos para número de linhas
         self.row = int(
             np.round((self.sec*(self.signal[0].shape[0]) / (60)) / columns)*columns)
@@ -53,7 +45,6 @@ class DATA_1M():
         self.row = value  # setar os valor de linhas quando o usuario quiser
 
     # objeto Call usado para escolher se o dataset terá ou não transformada de Fourier
-<<<<<<< HEAD
 
     def get_clear(self):
 
@@ -107,11 +98,6 @@ class DATA_1M():
     def __call__(self, Fourier=False, Normalizing=False):
 
         if Fourier == True and Normalizing == True:
-=======
-    def __call__(self, Fourier=False):
-
-        if Fourier == True:
->>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
 
             """
             Retorna o dateframe apos a Tranformada de Fourier.
@@ -120,7 +106,6 @@ class DATA_1M():
             empyt_list = list(map(lambda x: [np.fft.fftn(x[self.jump_time_rows:self.jump_time_rows+int(self.row/self.n_jumps)]) for i in range(self.n_jumps)],
 
                                   self.signal))  # Aplicando a transformada de Fourier
-<<<<<<< HEAD
 
             # SEPARANDO REAL E IMAG
             clear, lte, wifi = map(lambda x:  np.concatenate((np.real(x).reshape(-1, 1), np.imag(
@@ -170,23 +155,6 @@ class DATA_1M():
 
             signal_list = list(map(lambda x: np.hstack(
                 x).reshape(-1, self.values_reshaped), samples_signal))    # Slicing data
-=======
-            # Slicing data
-        else:
-            empyt_list = []           # Não aplicando a Transformada de Fourier
-
-            empyt_list = list(map(lambda x: [(x[self.jump_time_rows:self.jump_time_rows+int(self.row/self.n_jumps)]) for i in range(self.n_jumps)],
-
-                                  self.signal))  # Slicing data
-
-        clear, lte, wifi = map(lambda x: np.concatenate((np.real(x).reshape(-1, 1), np.imag(
-            x).reshape(-1, 1)), axis=1), empyt_list[:3])  # Spliting the real and imaginary numbers
-
-        samples_signal = [clear, lte, wifi]
-
-        signal_list = list(map(lambda x: np.hstack(
-            x).reshape(-1, self.values_reshaped), samples_signal))  # Reshaping data
->>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
 
         # Creating labels  0 - CLEAR , 1 - WIFI - 2 LTE
         result = []
@@ -208,11 +176,7 @@ class DATA_1M():
         self.full_dataset = np.concatenate(result, axis=0)
 
         print(
-<<<<<<< HEAD
             f"tamanho da memória ocupada :{self.full_dataset.nbytes/(1024**2):.2f} MB")
-=======
-            f"tamanho da memória ocupada :{self.full_dataset.nbytes/1024**2:.f} MB ")
->>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
 
         return np.concatenate(result, axis=0)
 
@@ -226,11 +190,7 @@ class DATA_1M():
                                                             random_state=random_state, shuffle=shuffle)
 
         # Convertendos os arrays para tensor e passando para device setadi
-<<<<<<< HEAD
         self.X_train = torch.tensor(X_train).to(device)
-=======
-        self.X_train = (torch.tensor(X_train)).to(device)
->>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
         self.X_test = torch.tensor(X_test).to(device)
         self.y_train = torch.tensor(y_train).to(device)
         self.y_test = torch.tensor(y_test).to(device)
@@ -241,17 +201,10 @@ class DATA_1M():
         print("y_test shape:", y_test.shape, y_train.dtype)
         print("\n--------")
 
-<<<<<<< HEAD
         print("X_train device:", self.X_train.device)
         print("X_Test device:", self.X_test.device)
         print("y_train device:", self.y_train.device)
         print("y_test device:", self.y_test.device)
-=======
-        print("X_train device:", X_train.device)
-        print("X_Test device:", X_test.device)
-        print("y_train device:", y_train.device)
-        print("y_test device:", y_test.device)
->>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
 
         arr_non_negative = y.astype('int64') - np.min(y.astype('int64'))
     # Calcular a contagem de cada valor
@@ -284,11 +237,7 @@ class DATA_1M():
 
         X, y = next(iter(self.train_dataloader))
         # Visualizar o shape do dataloader target e treino
-<<<<<<< HEAD
         print(f"X {X.shape} y {y.shape}")
-=======
-        print(X.shape, y.shape)
->>>>>>> 11f7e2d6a7f15646d7d80b0157c0f2c435a18348
         print("----------------\n")
 
         print(f"Dataloaders: {self.train_dataloader, self.test_dataloader}")
