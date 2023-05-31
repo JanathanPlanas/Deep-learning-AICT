@@ -12,7 +12,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from Data_Loader import DATA_1M
-from helper_functions import accuracy_fn
 from mlxtend.plotting import plot_confusion_matrix
 from sklearn.metrics import (accuracy_score, classification_report,
                              confusion_matrix, f1_score, recall_score)
@@ -23,33 +22,38 @@ from tqdm.auto import tqdm
 
 class NeuralNetCNN():
     """
-    A classe NeuralNetCnn é responsável por aplicado o Modelo CNN usando o número de layers conforme o valor setado em Classifier
+A classe NeuralNetCNN representa um modelo de rede neural convolucional.
 
-    tendo como objetos :
+Construtor:
 
-    -> Training_loop
-    -> call 
-    -> print_train_time
-    -> Making predictions
-    -> print confusion matrix
-    -> print classification report
-    -> print accuracy
+__init__(self, colunas): Inicializa a classe.
+colunas (int): O número de canais de entrada.
+Atributos:
+
+dispositivo (torch.device): O dispositivo usado para computação (CUDA, se disponível, caso contrário, CPU).
+Cnn (Classificador): O modelo CNN.
+ExtenderClassifier (ExtenderClassifier): O modelo de classificador estendido.
+loss_fn (nn.CrossEntropyLoss): A função de perda usada para treinamento.
+otimizador (torch.optim.Adam): O otimizador para atualizar os parâmetros do modelo CNN.
+optimizer_extended (torch.optim.Adam): O otimizador para atualizar os parâmetros do modelo de classificador estendido.
+Métodos:
+
+__str__(self) -> str: Retorna uma representação de string da classe, incluindo o dispositivo e o modelo CNN.
+__setitem__(self, value): Define a função de perda para o valor especificado.
+Observação: o trecho de código fornecido está incompleto e o objetivo do método __setitem__ não é claro sem um contexto adicional.  
 
     """
 
-    def __init__(self, columns):
+    def __init__(self, columns, convblocks, groupblocks):
 
         self.device = (torch.device('cuda') if torch.cuda.is_available()
                        else torch.device('cpu'))
 
-        self.Cnn = Classifier(in_channels_columns=columns)
-        self.ExtenderClassifier = ExtenderClassifier(
-            in_channels_columns=columns)
+        self.Cnn = Classifier(in_channels_columns=columns, conv_blocks =  convblocks , group_blocks=groupblocks )
 
         self.loss_fn = nn.CrossEntropyLoss()
 
         self.optimizer = torch.optim.Adam(self.Cnn.parameters(), lr= 1e-3)
-        self.optimizer_extended = torch.optim.Adam(self.ExtenderClassifier.parameters(), lr= 1e-3)
 
     def __str__(self) -> str:
 
@@ -69,7 +73,37 @@ class NeuralNetCNN():
                       accuracy_fn,
                       device: torch.device,
                       epochs: int, inplace=False):
-        # loop pelo dataloader de treino
+        """Treina e testa um modelo PyTorch.
+
+     Passa um modelo PyTorch de destino por meio de train_step() e test_step()
+     funções para um número de épocas, treinando e testando o modelo
+     no mesmo loop de época.
+
+     Calcula, imprime e armazena métricas de avaliação.
+
+     Argumentos:
+       model: um modelo PyTorch a ser treinado e testado.
+       train_dataloader: Uma instância do DataLoader para o modelo a ser treinado.
+       test_dataloader: Uma instância do DataLoader para o modelo a ser testado.
+       otimizador: Um otimizador PyTorch para ajudar a minimizar a função de perda.
+       loss_fn: uma função de perda do PyTorch para calcular a perda em ambos os conjuntos de dados.
+       epochs: Um número inteiro indicando para quantas épocas treinar.
+       dispositivo: um dispositivo de destino para calcular (por exemplo, "cuda" ou "cpu").
+      
+     Retorna:
+       Um dicionário de perda de treinamento e teste, bem como treinamento e
+       testar métricas de precisão. Cada métrica tem um valor em uma lista para
+       cada época.
+       Na forma: {train_loss: [...],
+                 train_acc: [...],
+                 teste_perda: [...],
+                 test_acc: [...]}
+       Por exemplo, se o treinamento for epochs=2:
+               {train_loss: [2.0616, 1.0537],
+                 train_acc: [0,3945, 0,3945],
+                 perda_teste: [1.2641, 1.5706],
+                 test_acc: [0,3400, 0,2973]}
+     """
 
         results_array_test = np.empty((epochs, 2))
         results_array_train = np.empty([epochs, 2])
@@ -87,6 +121,7 @@ class NeuralNetCNN():
                 # movendo os dados para o dispositivo de processamento
                 inputs = inputs.to(device).double()
                 inputs = inputs.unsqueeze(2)
+                target = target.unsqueeze(1)
                 # fazendo as previsões
                 output = model(inputs.double())
 
@@ -129,6 +164,7 @@ class NeuralNetCNN():
                     data = data.to(device)
                     target = target.to(device)
                     data = data.unsqueeze(2)
+                    target = target.unsqueeze(1)
 
                     # 1. Forward pass
                     test_pred = model(data)
@@ -159,6 +195,21 @@ class NeuralNetCNN():
             pass
 
     def __call__(self, train: bool, test: bool) -> Any:
+
+        """
+     Recupera as métricas de desempenho para treinamento e/ou teste.
+
+     Argumentos:
+         train (bool): sinalizador indicando se deve incluir métricas de treinamento.
+         test (bool): sinalizador indicando se deve incluir métricas de teste.
+
+     Retorna:
+         pd.DataFrame ou None: DataFrame contendo as métricas solicitadas. Se train e test forem True,
+                               o DataFrame incluirá métricas de treinamento e teste. Se apenas test for True,
+                               ele incluirá apenas métricas de teste. Se apenas train for True, ele incluirá apenas
+                               métricas de treinamento. Se train e test forem False, retorna None.
+
+     """
 
         if train == True and test == True:
             return pd.DataFrame({
@@ -196,7 +247,17 @@ class NeuralNetCNN():
 
     def Making_Predictions(self, data_loader: torch.utils.data.DataLoader,
                            model: torch.nn.Module):
-        # Import tqdm for progress bar
+        """
+     Faz previsões usando um modelo treinado no carregador de dados fornecido.
+
+     Argumentos:
+         data_loader (torch.utils.data.DataLoader): DataLoader contendo os dados de entrada.
+         modelo (torch.nn.Module): modelo treinado para ser usado para fazer previsões.
+
+     Retorna:
+         tocha.Tensor: Tensor contendo os rótulos previstos.
+
+     """
 
         # 1. Make predictions with trained model
         y_preds = []
@@ -235,7 +296,24 @@ class NeuralNetCNN():
 
 
 class ConvBlock(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    """
+    A classe ConvBlock representa um bloco de camadas convolucionais com normalização em lote e funções de ativação. Ele é projetado para processar dados de entrada unidimensionais.
+
+Aqui está uma divisão da classe:
+
+__init__(self, in_channels, out_channels): Inicializa a instância ConvBlock.
+
+in_channels (int): Número de canais de entrada.
+out_channels (int): Número de canais de saída.
+Configura duas camadas convolucionais sequenciais (conv1 e conv2) com normalização em lote e funções de ativação.
+forward(self, x): Executa a passagem direta pelo ConvBlock.
+
+x (tocha.Tensor): Tensor de entrada.
+Passa o tensor de entrada pelas camadas conv1 e conv2.
+Retorna o tensor de saída.
+A classe ConvBlock pode ser usada como um bloco de construção em uma rede neural convolucional para extrair recursos de dados de entrada unidimensionais.
+    """
+    def __init__(self, in_channels, out_channels, conv_blocks =1 ):
         super().__init__()
 
         self.conv1 = nn.Sequential(
@@ -243,132 +321,177 @@ class ConvBlock(nn.Module):
                       kernel_size=2, padding=1, stride=1),
             nn.BatchNorm1d(out_channels),
             nn.ReLU(),
-            nn.Conv1d(out_channels, out_channels,
-                      kernel_size=2, padding=1, stride=1),
-            nn.BatchNorm1d(out_channels),
-            nn.ReLU()
-        )
-        self.conv2 = nn.Sequential(
-            nn.Conv1d(out_channels, out_channels,
-                      kernel_size=2, padding=1, stride=1),
-            nn.BatchNorm1d(out_channels),
-            nn.Tanh(),
-            nn.MaxPool1d(kernel_size=2),
-            nn.Conv1d(out_channels, out_channels,
-                      kernel_size=2, padding=1, stride=1),
-            nn.BatchNorm1d(out_channels),
-            nn.Tanh(),
             nn.MaxPool1d(kernel_size=2)
         )
 
     def forward(self, x):
         x = self.conv1(x)
-        x = self.conv2(x)
+            
         return x
 
+        if conv_blocks == 2 :
 
-class Classifier(nn.Module):
-    def __init__(self, in_channels_columns):
-        super().__init__()
-
-        self.conv = nn.Sequential(
-            ConvBlock(in_channels=in_channels_columns, out_channels=32),
-            ConvBlock(in_channels=32, out_channels=48),
-            ConvBlock(in_channels=48, out_channels=64),
-            # ConvBlock(in_channels=256, out_channels=512),
-        )
-
-        self.classifier = nn.Sequential(
-            #             nn.Dropout(0.2),
-            nn.BatchNorm1d(64),
-            nn.Linear(64, 32),
-            nn.ReLU(),
-            nn.BatchNorm1d(32),
-            #             nn.Dropout(0.2),
-            nn.Linear(32, 3),
-            nn.LogSoftmax(dim=1)
-        )
-
-    def forward(self, x):
-        out = self.conv(x)
-
-        out = out.view(out.size(0), -1)
-        out = self.classifier(out)
-
-        out = nn.functional.softmax(out, dim=1)
-        return out
-
-
-class ConvBlockExtended(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-
-        self.conv1 = nn.Sequential(
+            self.conv1 = nn.Sequential(
             nn.Conv1d(in_channels, out_channels,
                       kernel_size=2, padding=1, stride=1),
             nn.BatchNorm1d(out_channels),
             nn.ReLU(),
+        )
+
+            self.conv2 = nn.Sequential(
             nn.Conv1d(out_channels, out_channels,
                       kernel_size=2, padding=1, stride=1),
             nn.BatchNorm1d(out_channels),
-            nn.ReLU(),
-            nn.Conv1d(out_channels, out_channels,
+            nn.Tanh(),
+            nn.MaxPool1d(kernel_size=2),
+        )
+            def forward(self, x):
+                x = self.conv1(x)
+                x = self.conv2(x)
+                return x
+
+        if conv_blocks == 3 :
+
+            self.conv1 = nn.Sequential(
+            nn.Conv1d(in_channels, out_channels,
                       kernel_size=2, padding=1, stride=1),
             nn.BatchNorm1d(out_channels),
             nn.ReLU()
         )
-        self.conv2 = nn.Sequential(
+
+            self.conv2 = nn.Sequential(
             nn.Conv1d(out_channels, out_channels,
                       kernel_size=2, padding=1, stride=1),
             nn.BatchNorm1d(out_channels),
             nn.Tanh(),
             nn.MaxPool1d(kernel_size=2),
+
+        )
+
+            self.conv3 = nn.Sequential(
             nn.Conv1d(out_channels, out_channels,
                       kernel_size=2, padding=1, stride=1),
             nn.BatchNorm1d(out_channels),
             nn.Tanh(),
             nn.MaxPool1d(kernel_size=2),
-            nn.Conv1d(out_channels, out_channels,
-                      kernel_size=2, padding=1, stride=1),
-            nn.BatchNorm1d(out_channels),
-            nn.Tanh(),
-            nn.MaxPool1d(kernel_size=2)
         )
+            def forward(self, x):
+                x = self.conv1(x)
+                x = self.conv2(x)
+                x = self.conv3(x)
+                return x
 
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x)
-        return x
+        else :
+            pass
 
-class ExtenderClassifier(nn.Module):
-    def __init__(self, in_channels_columns):
-        super().__init__()
 
-        self.conv = nn.Sequential(
-            ConvBlockExtended(in_channels=in_channels_columns, out_channels=32),
-            ConvBlockExtended(in_channels=32, out_channels=48),
-            ConvBlockExtended(in_channels=48, out_channels=64),
-        )
 
-        self.classifier = nn.Sequential(
-            #             nn.Dropout(0.2),
-            nn.BatchNorm1d(64),
-            nn.Linear(64, 32),
-            nn.ReLU(),
-            nn.BatchNorm1d(32),
-            #             nn.Dropout(0.2),
-            nn.Linear(32, 3),
-            nn.LogSoftmax(dim=1)
-        )
 
-    def forward(self, x):
-        out = self.conv(x)
+class Classifier(ConvBlock):
+    """
+    A classe Classifier representa um modelo de rede neural convolucional (CNN) para classificação. Consiste em vários blocos convolucionais seguidos por uma camada classificadora totalmente conectada.
 
-        out = out.view(out.size(0), -1)
-        out = self.classifier(out)
+Aqui está uma divisão da classe:
 
-        out = nn.functional.softmax(out, dim=1)
-        return out
+__init__(self, in_channels_columns): Inicializa a instância do Classificador.
+
+in_channels_columns (int): Número de canais/colunas de entrada.
+Configura as camadas convolucionais usando a classe ConvBlock, com números crescentes de canais de saída.
+Configura as camadas do classificador, incluindo normalização em lote, camadas lineares (totalmente conectadas) e funções de ativação.
+forward(self, x): Executa a passagem direta pelo modelo Classificador.
+
+x (tocha.Tensor): Tensor de entrada.
+Passa o tensor de entrada pelas camadas convolucionais (conv) e remodela a saída.
+Passa o tensor remodelado pelas camadas classificadoras (classificador).
+Aplica uma função de ativação softmax ao tensor de saída e o retorna.
+O modelo classificador é projetado para obter dados de entrada com vários canais/colunas, aplicar operações convolucionais para extrair recursos e, em seguida, classificar os recursos extraídos em uma das três classes usando as camadas totalmente conectadas e a ativação softmax.
+    """
+    def __init__(self, in_channels_columns, conv_blocks=1, group_blocks =1):
+        super().__init__(in_channels=in_channels_columns, out_channels=32, conv_blocks=conv_blocks)
+
+
+        if group_blocks == 1 :
+            self.conv = nn.Sequential(
+                ConvBlock(in_channels=in_channels_columns, out_channels=32),
+            )
+
+            self.classifier = nn.Sequential(
+                #             nn.Dropout(0.2),
+                nn.BatchNorm1d(32),
+                nn.Linear(32, 20),
+                nn.ReLU(),
+                nn.BatchNorm1d(20),
+                #             nn.Dropout(0.2),
+                nn.Linear(20, 3),
+                nn.LogSoftmax(dim=1)
+            )
+
+            def forward(self, x):
+                out = self.conv(x)
+
+                out = out.view(out.size(0), -1)
+                out = self.classifier(out)
+
+                out = nn.functional.softmax(out, dim=1)
+                return out
+
+        if group_blocks == 2 :
+            self.conv = nn.Sequential(
+                ConvBlock(in_channels=in_channels_columns, out_channels=32),
+                ConvBlock(in_channels=32, out_channels=48),
+            )
+
+            self.classifier = nn.Sequential(
+                #             nn.Dropout(0.2),
+                nn.BatchNorm1d(48),
+                nn.Linear(48, 32),
+                nn.ReLU(),
+                nn.BatchNorm1d(32),
+                #             nn.Dropout(0.2),
+                nn.Linear(32, 3),
+                nn.LogSoftmax(dim=1)
+            )
+
+            def forward(self, x):
+                out = self.conv(x)
+
+                out = out.view(out.size(0), -1)
+                out = self.classifier(out)
+
+                out = nn.functional.softmax(out, dim=1)
+                return out
+
+
+        if group_blocks == 3:
+            self.conv = nn.Sequential(
+                ConvBlock(in_channels=in_channels_columns, out_channels=32),
+                ConvBlock(in_channels=32, out_channels=48),
+                ConvBlock(in_channels=48, out_channels=64)
+            )
+
+            self.classifier = nn.Sequential(
+                #             nn.Dropout(0.2),
+                nn.BatchNorm1d(64),
+                nn.Linear(64, 32),
+                nn.ReLU(),
+                nn.BatchNorm1d(32),
+                #             nn.Dropout(0.2),
+                nn.Linear(32, 3),
+                nn.LogSoftmax(dim=1)
+            )
+
+            def forward(self, x):
+                out = self.conv(x)
+
+                out = out.view(out.size(0), -1)
+                out = self.classifier(out)
+
+                out = nn.functional.softmax(out, dim=1)
+                return out
+
+        else : 
+            pass
+
 
 class Putting_All_Together():
 

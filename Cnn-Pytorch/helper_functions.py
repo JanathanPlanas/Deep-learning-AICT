@@ -1,25 +1,291 @@
 """
-A series of helper functions used throughout the course.
+A series of helper functions used throughout the Pytorch Model.
 
-If a function gets defined once and could be used over and over, it'll go in here.
+
 """
+
 import os
 import zipfile
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pip
 import requests
 import seaborn as sns
 import torch
-import torchvision
 from sklearn.model_selection import RandomizedSearchCV
 # Walk through an image classification directory and find out how many files (images)
 # are in each subdirectory.
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from torch import nn
+from torch.utils.tensorboard import SummaryWriter
+from torchinfo import summary
+from tqdm.auto import tqdm
+
+writer = SummaryWriter()
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def create_writer(experiment_name: str,
+                  model_name: str,
+                  extra: str = None) -> torch.utils.tensorboard.writer.SummaryWriter():
+    """Cria uma instância arch.utils.tensorboard.writer.SummaryWriter() salvando em um log_dir específico.
+
+     log_dir é uma combinação de runs/timestamp/experiment_name/model_name/extra.
+
+     Onde timestamp é a data atual no formato AAAA-MM-DD.
+
+     Argumentos:
+         experiment_name (str): Nome do experimento.
+         model_name (str): Nome do modelo.
+         extra (str, opcional): Qualquer coisa extra para adicionar ao diretório. O padrão é Nenhum.
+
+     Retorna:
+         archote.utils.tensorboard.writer.SummaryWriter(): Instância de um gravador salvando em log_dir.
+
+     Exemplo de uso:
+         # Crie um gravador salvando em "runs/2022-06-04/data_10_percent/effnetb2/5_epochs/"
+         escritor = create_writer(experiment_name="data_10_percent",
+                                model_name="effnetb2",
+                                extra="5_épocas")
+         # O acima é o mesmo que:
+         Writer = SummaryWriter(log_dir="runs/2022-06-04/data_10_percent/effnetb2/5_epochs/")
+    """
+    import os
+    from datetime import datetime
+
+    # Get timestamp of current date (all experiments on certain day live in same folder)
+    # returns current date in YYYY-MM-DD format
+    timestamp = datetime.now().strftime("%Y-%m-%d")
+
+    if extra:
+        # Create log directory path
+        log_dir = os.path.join(
+            "runs", timestamp, experiment_name, model_name, extra)
+    else:
+        log_dir = os.path.join("runs", timestamp, experiment_name, model_name)
+
+    print(f"[INFO] Created SummaryWriter, saving to: {log_dir}...")
+    return SummaryWriter(log_dir=log_dir)
+
+
+def train_step(model: torch.nn.Module,
+               dataloader: torch.utils.data.DataLoader,
+               loss_fn: torch.nn.Module,
+               optimizer: torch.optim.Optimizer,
+               device: torch.device) -> Tuple[float, float]:
+    """Treina um modelo PyTorch para uma única época.
+
+     Transforma um modelo PyTorch de destino no modo de treinamento e, em seguida,
+     percorre todas as etapas de treinamento necessárias (avançar
+     passar, cálculo de perda, etapa do otimizador).
+
+     Argumentos:
+     model: um modelo PyTorch a ser treinado.
+     dataloader: Uma instância do DataLoader para o modelo a ser treinado.
+     loss_fn: uma função de perda do PyTorch para minimizar.
+     otimizador: Um otimizador PyTorch para ajudar a minimizar a função de perda.
+     dispositivo: um dispositivo de destino para calcular (por exemplo, "cuda" ou "cpu").
+
+     Retorna:
+     Uma tupla de métricas de perda de treinamento e precisão de treinamento.
+     No formulário (train_loss, train_accuracy). Por exemplo:
+
+     (0,1112, 0,8743)
+     """
+    # Put model in train mode
+    model.to(device)
+    model.train().double()
+    # Setup train loss and train accuracy values
+    train_loss, train_acc = 0, 0
+
+    # Loop through data loader data batches
+    for batch, (inputs, target) in enumerate(dataloader):
+        # movendo os dados para o dispositivo de processamento
+        inputs, target = inputs.to(device), target.to(device)
+        inputs = inputs.unsqueeze(2)
+
+        # fazendo as previsões
+        target_pred = model(inputs.double())
+
+        # calculando a perda
+        loss = loss_fn(target_pred, target.long())
+
+        train_loss += loss.data.item()
+
+        # retropropagando os gradientes e atualizando os pesos
+        optimizer.zero_grad()
+
+        # 4. Loss backward
+        loss.backward()
+
+        # 5. Optimizer step
+        optimizer.step()
+
+        # Calculate and accumulate accuracy metric across all batches
+        y_pred_class = torch.argmax(torch.softmax(target_pred, dim=1), dim=1)
+        train_acc += (y_pred_class == target).sum().data.item() / \
+            len(target_pred)
+
+    # Adjust metrics to get average loss and accuracy per batch
+    train_loss = train_loss / len(dataloader)
+    train_acc = train_acc / len(dataloader)
+    return train_loss, train_acc
+
+
+def test_step(model: torch.nn.Module,
+              dataloader: torch.utils.data.DataLoader,
+              loss_fn: torch.nn.Module,
+              device: torch.device) -> Tuple[float, float]:
+    """Testa um modelo PyTorch para uma única época.
+
+     Transforma um modelo PyTorch de destino no modo "eval" e, em seguida, executa
+     uma passagem direta em um conjunto de dados de teste.
+
+     Argumentos:
+     model: Um modelo PyTorch a ser testado.
+     dataloader: Uma instância do DataLoader para o modelo a ser testado.
+     loss_fn: uma função de perda do PyTorch para calcular a perda nos dados de teste.
+     dispositivo: um dispositivo de destino para calcular (por exemplo, "cuda" ou "cpu").
+
+     Retorna:
+     Uma tupla de perda de teste e métricas de precisão de teste.
+     No formulário (test_loss, test_accuracy). Por exemplo:
+
+     (0,0223, 0,8985)
+     """
+    # Coloca o modelo no modo eval
+    model.eval().double()
+
+    # Setup test loss and test accuracy values
+    test_loss, test_acc = 0, 0
+
+    # Turn on inference context manager
+    with torch.inference_mode():
+        # Loop through DataLoader batches
+        for batch, (data, target) in enumerate(dataloader):
+            # Send data to target device
+            data, target = data.to(device), target.to(device)
+            data = data.unsqueeze(2)
+
+            # 1. Forward pass
+            test_pred_logits = model(data)
+
+            # 2. Calculate and accumulate loss
+            loss = loss_fn(test_pred_logits, target.long())
+            test_loss += loss.data.item()
+
+            test_pred_labels = test_pred_logits.argmax(dim=1)
+            test_acc += ((test_pred_labels ==
+                         target).sum().data.item()/len(test_pred_labels))
+
+    # Adjust metrics to get average loss and accuracy per batch
+    test_loss = test_loss / len(dataloader)
+    test_acc = test_acc / len(dataloader)
+    return test_loss, test_acc
+
+
+def train(model: torch.nn.Module,
+          train_dataloader: torch.utils.data.DataLoader,
+          test_dataloader: torch.utils.data.DataLoader,
+          optimizer: torch.optim.Optimizer,
+          loss_fn: torch.nn.Module,
+          epochs: int,
+          device: torch.device,
+          writer: torch.utils.tensorboard.writer.SummaryWriter) -> Dict[str, List]:
+    """Treina e testa um modelo PyTorch.
+
+     Passa um modelo PyTorch de destino por meio de train_step() e test_step()
+     funções para um número de épocas, treinando e testando o modelo
+     no mesmo loop de época.
+
+     Calcula, imprime e armazena métricas de avaliação.
+
+     Argumentos:
+     model: um modelo PyTorch a ser treinado e testado.
+     train_dataloader: Uma instância do DataLoader para o modelo a ser treinado.
+     test_dataloader: Uma instância do DataLoader para o modelo a ser testado.
+     otimizador: Um otimizador PyTorch para ajudar a minimizar a função de perda.
+     loss_fn: uma função de perda do PyTorch para calcular a perda em ambos os conjuntos de dados.
+     epochs: Um número inteiro indicando para quantas épocas treinar.
+     dispositivo: um dispositivo de destino para calcular (por exemplo, "cuda" ou "cpu").
+
+     Retorna:
+     Um dicionário de perda de treinamento e teste, bem como treinamento e
+     testar métricas de precisão. Cada métrica tem um valor em uma lista para
+     cada época.
+     Na forma: {train_loss: [...],
+               train_acc: [...],
+               teste_perda: [...],
+               test_acc: [...]}
+     Por exemplo, se o treinamento for epochs=2:
+              {train_loss: [2.0616, 1.0537],
+               train_acc: [0,3945, 0,3945],
+               perda_teste: [1.2641, 1.5706],
+               test_acc: [0,3400, 0,2973]}
+     """
+    # Cria um dicionário de resultados vazio
+    results = {"train_loss": [],
+               "train_acc": [],
+               "test_loss": [],
+               "test_acc": []
+               }
+
+    # Make sure model on target device
+    model.to(device).double()
+
+    # Loop through training and testing steps for a number of epochs
+    for epoch in tqdm(range(epochs)):
+        train_loss, train_acc = train_step(model=model,
+                                           dataloader=train_dataloader,
+                                           loss_fn=loss_fn,
+                                           optimizer=optimizer,
+                                           device=device)
+        test_loss, test_acc = test_step(model=model,
+                                        dataloader=test_dataloader,
+                                        loss_fn=loss_fn,
+                                        device=device)
+
+        # Print out what's happening
+        print(
+            f"Epoch: {epoch+1} | "
+            f"train_loss: {train_loss:.4f} | "
+            f"train_acc: {train_acc:.4f} | "
+            f"test_loss: {test_loss:.4f} | "
+            f"test_acc: {test_acc:.4f}"
+        )
+
+        # Update results dictionary
+        results["train_loss"].append(train_loss)
+        results["train_acc"].append(train_acc)
+        results["test_loss"].append(test_loss)
+        results["test_acc"].append(test_acc)
+
+        if writer:
+            writer.add_scalars(main_tag="Loss",
+                               tag_scalar_dict={"Test Loss": test_loss},
+                               global_step=epoch)
+
+            # Add accuracy results to SummaryWriter
+            writer.add_scalars(main_tag="Accuracy",
+                               tag_scalar_dict={"Test Accuracy": test_acc},
+                               global_step=epoch)
+
+            # Track the PyTorch model architecture
+            writer.add_graph(model=model,
+                             # Pass in an example input
+                             input_to_model=torch.randn(8, 2000, 1).to(device).double())
+
+            # Close the writer
+            writer.close()
+        else:
+            pass
+
+    # Return the filled results at the end of the epochs
+    return results
 
 
 def walk_through_dir(dir_path):
@@ -307,8 +573,6 @@ def download_data(source: str,
             os.remove(data_path / target_file)
 
     return image_path
-
-    import matplotlib.pyplot as plt
 
 
 mm = MinMaxScaler(feature_range=(0, 1))
