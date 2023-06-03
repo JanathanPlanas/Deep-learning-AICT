@@ -4,6 +4,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import torch
+from helper_functions import normalize
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -23,7 +24,7 @@ class DATA_1M():
 
         data = ['Clear.npy', 'WIFI_1M.npy', 'LTE_1M.npy']
         self.signal = list(map(lambda x: (np.load(
-            f"C:/Users/janathan.pena/Documents/GitHub/{x}")), data))  # Data load
+            f"C:/Users/janat/OneDrive/Documentos/GitHub/Data_/{x}")), data))  # Data load
 
         self.clear = self.signal[0]
         self.wifi = self.signal[1]

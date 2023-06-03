@@ -12,10 +12,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from Data_Loader import DATA_1M
+from helper_functions import accuracy_fn
 from mlxtend.plotting import plot_confusion_matrix
 from sklearn.metrics import (accuracy_score, classification_report,
                              confusion_matrix, f1_score, recall_score)
 from sklearn.model_selection import train_test_split
+from torch.utils.tensorboard import SummaryWriter
+from torchinfo import summary
 from torchmetrics import ConfusionMatrix
 from tqdm.auto import tqdm
 
@@ -37,19 +40,21 @@ loss_fn (nn.CrossEntropyLoss): A função de perda usada para treinamento.
 otimizador (torch.optim.Adam): O otimizador para atualizar os parâmetros do modelo CNN.
 optimizer_extended (torch.optim.Adam): O otimizador para atualizar os parâmetros do modelo de classificador estendido.
 Métodos:
-
+    
 __str__(self) -> str: Retorna uma representação de string da classe, incluindo o dispositivo e o modelo CNN.
 __setitem__(self, value): Define a função de perda para o valor especificado.
 Observação: o trecho de código fornecido está incompleto e o objetivo do método __setitem__ não é claro sem um contexto adicional.  
 
     """
 
-    def __init__(self, columns, convblocks, groupblocks):
+    def __init__(self, columns, conv_blocks, groupblocks):
+
+        self.columns_shape = columns
 
         self.device = (torch.device('cuda') if torch.cuda.is_available()
                        else torch.device('cpu'))
 
-        self.Cnn = Classifier(in_channels_columns=columns, conv_blocks =  convblocks , group_blocks=groupblocks )
+        self.Cnn = Classifier(in_channels_columns=columns, conv_blocks =  conv_blocks , group_blocks=groupblocks )
 
         self.loss_fn = nn.CrossEntropyLoss()
 
@@ -63,6 +68,15 @@ Observação: o trecho de código fornecido está incompleto e o objetivo do mé
 
         self.loss_fn = value
 
+
+   
+    def count_blocks(self, model:torch.nn.Module):
+        count = 0
+        for module in model.modules():
+            if isinstance(module, nn.Sequential):
+                count += 1
+        return count
+
     # carregando o modelo e fazendo automatica os prints do treino e teste de acurácia de loss functions
 
     def training_loop(self, model: torch.nn.Module,
@@ -72,7 +86,9 @@ Observação: o trecho de código fornecido está incompleto e o objetivo do mé
                       optimizer: torch.optim.Optimizer,
                       accuracy_fn,
                       device: torch.device,
-                      epochs: int, inplace=False):
+                      epochs: int, 
+                      writer: torch.utils.tensorboard.writer.SummaryWriter
+                      ,inplace=False):
         """Treina e testa um modelo PyTorch.
 
      Passa um modelo PyTorch de destino por meio de train_step() e test_step()
@@ -121,7 +137,6 @@ Observação: o trecho de código fornecido está incompleto e o objetivo do mé
                 # movendo os dados para o dispositivo de processamento
                 inputs = inputs.to(device).double()
                 inputs = inputs.unsqueeze(2)
-                target = target.unsqueeze(1)
                 # fazendo as previsões
                 output = model(inputs.double())
 
@@ -156,7 +171,6 @@ Observação: o trecho de código fornecido está incompleto e o objetivo do mé
             valid_loss = 0
             test_loss = 0
             test_accurary = 0
-            accuracy_list = []
             with torch.inference_mode():
 
                 for data, target in data_loader_test:
@@ -164,8 +178,6 @@ Observação: o trecho de código fornecido está incompleto e o objetivo do mé
                     data = data.to(device)
                     target = target.to(device)
                     data = data.unsqueeze(2)
-                    target = target.unsqueeze(1)
-
                     # 1. Forward pass
                     test_pred = model(data)
                     # 2. Calculate loss and accuracy
@@ -182,6 +194,25 @@ Observação: o trecho de código fornecido está incompleto e o objetivo do mé
 
             results_array_test[epoch, 0] = "%.2f" % valid_loss
             results_array_test[epoch, 1] = "%.2f" % test_accurary
+
+            if writer:
+                writer.add_scalars(main_tag="Loss per Epoch",
+                                tag_scalar_dict={"Test Loss": valid_loss},
+                                global_step=epoch)
+
+                # Add accuracy results to SummaryWriter
+                writer.add_scalars(main_tag="Accuracy per Epoch",
+                                tag_scalar_dict={"Test Accuracy": test_accurary},
+                                global_step=epoch)
+
+                # Track the PyTorch model architecture
+                writer.add_graph(model=model,
+                                # Pass in an example input
+                                input_to_model=torch.randn(8, self.columns_shape , 1).to(device).double())
+                
+
+                # Close the writer
+                writer.close()
 
         self.test_acc = results_array_test[:, 1]
         self.tess_loss = results_array_test[:, 0]
@@ -313,9 +344,9 @@ Passa o tensor de entrada pelas camadas conv1 e conv2.
 Retorna o tensor de saída.
 A classe ConvBlock pode ser usada como um bloco de construção em uma rede neural convolucional para extrair recursos de dados de entrada unidimensionais.
     """
-    def __init__(self, in_channels, out_channels, conv_blocks =1 ):
+    def __init__(self, in_channels, out_channels, conv_blocks):
         super().__init__()
-
+        # 1 layer com 4 subcamadas
         self.conv1 = nn.Sequential(
             nn.Conv1d(in_channels, out_channels,
                       kernel_size=2, padding=1, stride=1),
@@ -324,65 +355,59 @@ A classe ConvBlock pode ser usada como um bloco de construção em uma rede neur
             nn.MaxPool1d(kernel_size=2)
         )
 
-    def forward(self, x):
-        x = self.conv1(x)
-            
-        return x
+        if conv_blocks >= 2 : # 2 layer com 4 subcamadas
 
-        if conv_blocks == 2 :
-
-            self.conv1 = nn.Sequential(
-            nn.Conv1d(in_channels, out_channels,
+            self.conv2 = nn.Sequential(
+            nn.Conv1d(out_channels, out_channels,
                       kernel_size=2, padding=1, stride=1),
             nn.BatchNorm1d(out_channels),
             nn.ReLU(),
+            nn.MaxPool1d(kernel_size=2)
         )
 
-            self.conv2 = nn.Sequential(
-            nn.Conv1d(out_channels, out_channels,
-                      kernel_size=2, padding=1, stride=1),
-            nn.BatchNorm1d(out_channels),
-            nn.Tanh(),
-            nn.MaxPool1d(kernel_size=2),
-        )
-            def forward(self, x):
-                x = self.conv1(x)
-                x = self.conv2(x)
-                return x
-
-        if conv_blocks == 3 :
-
-            self.conv1 = nn.Sequential(
-            nn.Conv1d(in_channels, out_channels,
-                      kernel_size=2, padding=1, stride=1),
-            nn.BatchNorm1d(out_channels),
-            nn.ReLU()
-        )
-
-            self.conv2 = nn.Sequential(
-            nn.Conv1d(out_channels, out_channels,
-                      kernel_size=2, padding=1, stride=1),
-            nn.BatchNorm1d(out_channels),
-            nn.Tanh(),
-            nn.MaxPool1d(kernel_size=2),
-
-        )
+        if conv_blocks >= 3 : # 3 layer com 4 subcamadas
 
             self.conv3 = nn.Sequential(
             nn.Conv1d(out_channels, out_channels,
                       kernel_size=2, padding=1, stride=1),
             nn.BatchNorm1d(out_channels),
             nn.Tanh(),
-            nn.MaxPool1d(kernel_size=2),
+            nn.MaxPool1d(kernel_size=2)
         )
-            def forward(self, x):
-                x = self.conv1(x)
-                x = self.conv2(x)
-                x = self.conv3(x)
-                return x
 
-        else :
-            pass
+
+        if conv_blocks == 4 : # 4 layer com 4 subcamadas
+
+            self.conv4 = nn.Sequential(
+            nn.Conv1d(out_channels, out_channels,
+                      kernel_size=2, padding=1, stride=1),
+            nn.BatchNorm1d(out_channels),
+            nn.Tanh(),
+            nn.MaxPool1d(kernel_size=2)
+        )
+            
+    def forward(self,x):
+
+        x = self.conv1(x)
+        if hasattr(self, 'conv2'):
+            x = self.conv2(x)
+        if hasattr(self, 'conv3'):
+            x = self.conv3(x)
+        if hasattr(self, 'conv4'):
+            x = self.conv4(x)
+        return x
+
+    @property
+    def conv_blocks(self):
+        return self._conv_blocks
+    
+    @conv_blocks.setter
+    def conv_blocks(self, value):
+        if value < 0 or value > 4:
+            print("Erro: conv_blocks inserido maior do que 4. O valor padrão de 1 será usado.")
+            self._conv_blocks = 1
+        else:
+            self._conv_blocks = value
 
 
 
@@ -406,13 +431,13 @@ Passa o tensor remodelado pelas camadas classificadoras (classificador).
 Aplica uma função de ativação softmax ao tensor de saída e o retorna.
 O modelo classificador é projetado para obter dados de entrada com vários canais/colunas, aplicar operações convolucionais para extrair recursos e, em seguida, classificar os recursos extraídos em uma das três classes usando as camadas totalmente conectadas e a ativação softmax.
     """
-    def __init__(self, in_channels_columns, conv_blocks=1, group_blocks =1):
+    def __init__(self, in_channels_columns, conv_blocks , group_blocks):
         super().__init__(in_channels=in_channels_columns, out_channels=32, conv_blocks=conv_blocks)
 
 
-        if group_blocks == 1 :
+        if group_blocks == 1 : # 1 layer com 4 subcamadas
             self.conv = nn.Sequential(
-                ConvBlock(in_channels=in_channels_columns, out_channels=32),
+                ConvBlock(in_channels=in_channels_columns, out_channels=32, conv_blocks = conv_blocks),
             )
 
             self.classifier = nn.Sequential(
@@ -426,19 +451,10 @@ O modelo classificador é projetado para obter dados de entrada com vários cana
                 nn.LogSoftmax(dim=1)
             )
 
-            def forward(self, x):
-                out = self.conv(x)
-
-                out = out.view(out.size(0), -1)
-                out = self.classifier(out)
-
-                out = nn.functional.softmax(out, dim=1)
-                return out
-
-        if group_blocks == 2 :
+        if group_blocks == 2 : # 2 layer com 4 subcamadas
             self.conv = nn.Sequential(
-                ConvBlock(in_channels=in_channels_columns, out_channels=32),
-                ConvBlock(in_channels=32, out_channels=48),
+                ConvBlock(in_channels=in_channels_columns, out_channels=32, conv_blocks = conv_blocks),
+                ConvBlock(in_channels=32, out_channels=48,conv_blocks = conv_blocks),
             )
 
             self.classifier = nn.Sequential(
@@ -452,21 +468,12 @@ O modelo classificador é projetado para obter dados de entrada com vários cana
                 nn.LogSoftmax(dim=1)
             )
 
-            def forward(self, x):
-                out = self.conv(x)
-
-                out = out.view(out.size(0), -1)
-                out = self.classifier(out)
-
-                out = nn.functional.softmax(out, dim=1)
-                return out
-
 
         if group_blocks == 3:
             self.conv = nn.Sequential(
-                ConvBlock(in_channels=in_channels_columns, out_channels=32),
-                ConvBlock(in_channels=32, out_channels=48),
-                ConvBlock(in_channels=48, out_channels=64)
+                ConvBlock(in_channels=in_channels_columns, out_channels=32, conv_blocks = conv_blocks),
+                ConvBlock(in_channels=32, out_channels=48,conv_blocks = conv_blocks),
+                ConvBlock(in_channels=48, out_channels=64,conv_blocks = conv_blocks)
             )
 
             self.classifier = nn.Sequential(
@@ -480,80 +487,61 @@ O modelo classificador é projetado para obter dados de entrada com vários cana
                 nn.LogSoftmax(dim=1)
             )
 
-            def forward(self, x):
-                out = self.conv(x)
+    @property
+    def group_blocks(self):
+        return self._group_blocks
+    
+    @group_blocks.setter
+    def group_blocks(self, value):
+        if value < 0 or value > 3:
+            print("Erro: group_blocks inserido maior do que 3. O valor padrão de 1 será usado.")
+            self._group_blocks = 1
+        else:
+            self._group_blocks = value
 
-                out = out.view(out.size(0), -1)
-                out = self.classifier(out)
 
-                out = nn.functional.softmax(out, dim=1)
-                return out
+    def forward(self, x):
+        out = self.conv(x)
 
-        else : 
-            pass
+        out = out.view(out.size(0), -1)
+        out = self.classifier(out)
 
-
-class Putting_All_Together():
-
-    def Running(self):
-        Data_loader = DATA_1M(seconds=5, columns=2000, jump_time=10, n_jumps=1)
-        Torch = NeuralNetCNN(columns=Data_loader(Fourier=True).shape[1] - 1)
-
-        Data_loader.Spliting(data=Data_loader(
-            Fourier=True), random_state=42, test_size=0.275, shuffle=True, inplace=False)
-        train_dataloader, test_dataloader = Data_loader.DataLoaders(
-            batch_size=256, inplace=True)
-
-        Torch.training_loop(data_loader_train=train_dataloader,
-                            data_loader_test=test_dataloader,
-                            model=Torch.modelCnnModel,
-                            loss_fn=Torch.loss_fn,
-                            optimizer=Torch.optimizer,
-                            accuracy_fn=accuracy_fn,
-                            device=Torch.device,
-                            epochs=5)
-
-        print(Torch(test=True, train=True))
-
-        class_names = ['CLEAR', 'WIFI', 'LTE']
-        # confmat = ConfusionMatrix(num_classes=3, task='multiclass')
-        # confmat_tensor = confmat(preds=  Torch.Making_Predictions(model = Torch.modelCnnModel, data_loader= Data_loader.test_dataloader),
-        #                         target= Data_loader.y_test )
-
-        print(classification_report(Data_loader.y_test, Torch.Making_Predictions(
-            model=Torch.modelCnnModel, data_loader=Data_loader.test_dataloader), target_names=class_names))
+        out = nn.functional.softmax(out, dim=1)
+        return out
 
 
 if __name__ == "__main__":
+    from helper_functions import train
 
-    data = DATA_1M(seconds=5, columns=128, jump_time=10, n_jumps=1)
-    data_fourier = data(Fourier=True, Normalizing=True)
-    Torch = NeuralNetCNN(columns=data_fourier.shape[1] - 1)
+    
+    columns = [500, 1000 ,2000,4000]
+    for i in range(len(columns)):
 
-    data.Spliting(data=data_fourier, random_state=38,
-                  test_size=0.25, shuffle=True, inplace=False)
+        data = DATA_1M(seconds=40,columns=500, jump_time =2, n_jumps=3) 
+        data_fourier = data(Fourier=True, Normalizing= True)
 
-    train_dataloader, test_dataloader = data.DataLoaders(
-        batch_size=32, inplace=True)
+        data = DATA_1M(seconds=40,columns=columns[i], jump_time =2, n_jumps=3) ; data_fourier = data(Fourier=True, Normalizing= True)
+        
+        Torch = NeuralNetCNN(columns= data_fourier.shape[1] -1,conv_blocks =1,groupblocks=1)
 
-    Torch.training_loop(data_loader_train=train_dataloader,
-                        data_loader_test=test_dataloader,
-                        model=Torch.Cnn,
-                        loss_fn=Torch.loss_fn,
-                        optimizer=Torch.optimizer,
-                        accuracy_fn=accuracy_fn,
-                        device=Torch.device,
-                        epochs=10)
+        data.Spliting(data= data_fourier, random_state= 30, test_size = 0.25, shuffle = True, inplace= False)
 
-    print(Torch(test=True, train=True))
+        train_dataloader , test_dataloader = data.DataLoaders(batch_size=64, inplace=False)
 
-    class_names = ['CLEAR', 'WIFI', 'LTE']
-    # confmat = ConfusionMatrix(num_classes=3, task='multiclass')
-    # confmat_tensor = confmat(preds=  Torch.Making_Predictions(model = Torch.modelCnnModel, data_loader= Data_loader.test_dataloader),
-    #                         target= Data_loader.y_test )
+        writer = SummaryWriter(f"""
+                            Experiment Fourier- {data_fourier.shape[1]-1} 
+                            input size - {len(list(Torch.Cnn.children()))} Layers ,
+                            {Torch.count_blocks(Torch.Cnn)} Blocks
+                            """)
 
-    print(classification_report(data.y_test, Torch.Making_Predictions(
-        model=Torch.Cnn, data_loader=test_dataloader), target_names=class_names))
+        train(model= Torch.Cnn,
+            train_dataloader= train_dataloader,
+            test_dataloader= test_dataloader,
+            optimizer= Torch.optimizer,
+            loss_fn= Torch.loss_fn,
+            device= Torch.device,
+            writer= writer,
+            epochs= 20)
 
 # class CNNModel(nn.Module):
 

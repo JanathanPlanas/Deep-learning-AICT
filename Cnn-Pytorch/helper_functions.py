@@ -16,6 +16,10 @@ import pip
 import requests
 import seaborn as sns
 import torch
+import torchmetrics
+import torchvision
+from sklearn.metrics import (accuracy_score, classification_report, f1_score,
+                             recall_score)
 from sklearn.model_selection import RandomizedSearchCV
 # Walk through an image classification directory and find out how many files (images)
 # are in each subdirectory.
@@ -27,49 +31,6 @@ from tqdm.auto import tqdm
 
 writer = SummaryWriter()
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
-
-def create_writer(experiment_name: str,
-                  model_name: str,
-                  extra: str = None) -> torch.utils.tensorboard.writer.SummaryWriter():
-    """Cria uma instância arch.utils.tensorboard.writer.SummaryWriter() salvando em um log_dir específico.
-
-     log_dir é uma combinação de runs/timestamp/experiment_name/model_name/extra.
-
-     Onde timestamp é a data atual no formato AAAA-MM-DD.
-
-     Argumentos:
-         experiment_name (str): Nome do experimento.
-         model_name (str): Nome do modelo.
-         extra (str, opcional): Qualquer coisa extra para adicionar ao diretório. O padrão é Nenhum.
-
-     Retorna:
-         archote.utils.tensorboard.writer.SummaryWriter(): Instância de um gravador salvando em log_dir.
-
-     Exemplo de uso:
-         # Crie um gravador salvando em "runs/2022-06-04/data_10_percent/effnetb2/5_epochs/"
-         escritor = create_writer(experiment_name="data_10_percent",
-                                model_name="effnetb2",
-                                extra="5_épocas")
-         # O acima é o mesmo que:
-         Writer = SummaryWriter(log_dir="runs/2022-06-04/data_10_percent/effnetb2/5_epochs/")
-    """
-    import os
-    from datetime import datetime
-
-    # Get timestamp of current date (all experiments on certain day live in same folder)
-    # returns current date in YYYY-MM-DD format
-    timestamp = datetime.now().strftime("%Y-%m-%d")
-
-    if extra:
-        # Create log directory path
-        log_dir = os.path.join(
-            "runs", timestamp, experiment_name, model_name, extra)
-    else:
-        log_dir = os.path.join("runs", timestamp, experiment_name, model_name)
-
-    print(f"[INFO] Created SummaryWriter, saving to: {log_dir}...")
-    return SummaryWriter(log_dir=log_dir)
 
 
 def train_step(model: torch.nn.Module,
@@ -188,6 +149,42 @@ def test_step(model: torch.nn.Module,
     return test_loss, test_acc
 
 
+def Making_Predictions(data_loader: torch.utils.data.DataLoader,
+                           model: torch.nn.Module,
+                           device : torch.device):
+        """
+     Faz previsões usando um modelo treinado no carregador de dados fornecido.
+
+     Argumentos:
+         data_loader (torch.utils.data.DataLoader): DataLoader contendo os dados de entrada.
+         modelo (torch.nn.Module): modelo treinado para ser usado para fazer previsões.
+
+     Retorna:
+         tocha.Tensor: Tensor contendo os rótulos previstos.
+
+     """
+
+        # 1. Make predictions with trained model
+        y_preds = []
+        model.eval()
+        with torch.inference_mode():
+            for X, y in (data_loader):
+                # Send data and targets to target device
+                X, y = X.to(device), y.to(device)
+
+                X = X.unsqueeze(2)
+                # Do the forward pass
+                y_logit = model(X)
+                # Turn predictions from logits -> prediction probabilities -> predictions labels
+                y_pred = torch.softmax(y_logit, dim=1).argmax(dim=1)
+                # Put predictions on CPU for evaluation
+                y_preds.append(y_pred.cpu())
+            # Concatenate list of predictions into a tensor
+            y_pred_tensor = torch.cat(y_preds)
+
+        return y_pred_tensor
+
+
 def train(model: torch.nn.Module,
           train_dataloader: torch.utils.data.DataLoader,
           test_dataloader: torch.utils.data.DataLoader,
@@ -228,8 +225,7 @@ def train(model: torch.nn.Module,
                test_acc: [0,3400, 0,2973]}
      """
     # Cria um dicionário de resultados vazio
-    results = {"train_loss": [],
-               "train_acc": [],
+    results = {
                "test_loss": [],
                "test_acc": []
                }
@@ -259,8 +255,6 @@ def train(model: torch.nn.Module,
         )
 
         # Update results dictionary
-        results["train_loss"].append(train_loss)
-        results["train_acc"].append(train_acc)
         results["test_loss"].append(test_loss)
         results["test_acc"].append(test_acc)
 
@@ -278,6 +272,7 @@ def train(model: torch.nn.Module,
             writer.add_graph(model=model,
                              # Pass in an example input
                              input_to_model=torch.randn(8, 2000, 1).to(device).double())
+            
 
             # Close the writer
             writer.close()
@@ -286,6 +281,8 @@ def train(model: torch.nn.Module,
 
     # Return the filled results at the end of the epochs
     return results
+
+
 
 
 def walk_through_dir(dir_path):
