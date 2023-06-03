@@ -46,7 +46,7 @@ class DATA_1M():
 
         data = ['Clear.npy', 'WIFI_1M.npy', 'LTE_1M.npy']
         self.signal = list(map(lambda x: (np.load(
-            f"C:/Users/janat/OneDrive/Documentos/GitHub/Data_/{x}")), data))  # Data load
+            f"C:/Users/janathan.pena/Documents/GitHub/{x}")), data))  # Data load
 
         self.clear = self.signal[0]
         self.wifi = self.signal[1]
@@ -189,6 +189,7 @@ class DATA_1M():
             samples_signal = [clear, lte, wifi]
 
             # RESHAPE DOS DADOS
+            
             signal_list = list(map(lambda x: np.hstack(
                 x).reshape(-1, self.values_reshaped), samples_signal))
             # Reshaping data            # Slicing data

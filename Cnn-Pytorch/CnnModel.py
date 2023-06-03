@@ -18,7 +18,6 @@ from sklearn.metrics import (accuracy_score, classification_report,
                              confusion_matrix, f1_score, recall_score)
 from sklearn.model_selection import train_test_split
 from torch.utils.tensorboard import SummaryWriter
-from torchinfo import summary
 from torchmetrics import ConfusionMatrix
 from tqdm.auto import tqdm
 
@@ -137,6 +136,7 @@ Observação: o trecho de código fornecido está incompleto e o objetivo do mé
                 # movendo os dados para o dispositivo de processamento
                 inputs = inputs.to(device).double()
                 inputs = inputs.unsqueeze(2)
+                
                 # fazendo as previsões
                 output = model(inputs.double())
 
@@ -177,6 +177,7 @@ Observação: o trecho de código fornecido está incompleto e o objetivo do mé
                     # movendo os dados para o dispositivo de processamento
                     data = data.to(device)
                     target = target.to(device)
+                    
                     data = data.unsqueeze(2)
                     # 1. Forward pass
                     test_pred = model(data)
@@ -194,7 +195,8 @@ Observação: o trecho de código fornecido está incompleto e o objetivo do mé
 
             results_array_test[epoch, 0] = "%.2f" % valid_loss
             results_array_test[epoch, 1] = "%.2f" % test_accurary
-
+            
+            
             if writer:
                 writer.add_scalars(main_tag="Loss per Epoch",
                                 tag_scalar_dict={"Test Loss": valid_loss},
@@ -204,6 +206,7 @@ Observação: o trecho de código fornecido está incompleto e o objetivo do mé
                 writer.add_scalars(main_tag="Accuracy per Epoch",
                                 tag_scalar_dict={"Test Accuracy": test_accurary},
                                 global_step=epoch)
+                
 
                 # Track the PyTorch model architecture
                 writer.add_graph(model=model,
@@ -306,9 +309,9 @@ Observação: o trecho de código fornecido está incompleto e o objetivo do mé
                 # Put predictions on CPU for evaluation
                 y_preds.append(y_pred.cpu())
             # Concatenate list of predictions into a tensor
-            y_pred_tensor = torch.cat(y_preds)
+            self.y_pred_tensor = torch.cat(y_preds)
 
-        return y_pred_tensor
+        return self.y_pred_tensor
 
     def print_confusion_matrix(self, y_true: torch.Tensor, y_pred: torch.Tensor, num_classes: int):
 
@@ -514,13 +517,10 @@ if __name__ == "__main__":
     from helper_functions import train
 
     
-    columns = [500, 1000 ,2000,4000]
-    for i in range(len(columns)):
+    input_size = [500, 1000 ,2000,4000]
+    for i in range(len(input_size)):
 
-        data = DATA_1M(seconds=40,columns=500, jump_time =2, n_jumps=3) 
-        data_fourier = data(Fourier=True, Normalizing= True)
-
-        data = DATA_1M(seconds=40,columns=columns[i], jump_time =2, n_jumps=3) ; data_fourier = data(Fourier=True, Normalizing= True)
+        data = DATA_1M(seconds=40,columns=input_size[i], jump_time =2, n_jumps=3) ; data_fourier = data(Fourier=True, Normalizing= True)
         
         Torch = NeuralNetCNN(columns= data_fourier.shape[1] -1,conv_blocks =1,groupblocks=1)
 
@@ -533,6 +533,10 @@ if __name__ == "__main__":
                             input size - {len(list(Torch.Cnn.children()))} Layers ,
                             {Torch.count_blocks(Torch.Cnn)} Blocks
                             """)
+        print(f""" Experiment Fourier- {data_fourier.shape[1]-1} 
+                           input size - {len(list(Torch.Cnn.children()))} Layers ,
+                           {Torch.count_blocks(Torch.Cnn)} Blocks
+                           """)
 
         train(model= Torch.Cnn,
             train_dataloader= train_dataloader,
