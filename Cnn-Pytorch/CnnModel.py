@@ -57,7 +57,7 @@ Observação: o trecho de código fornecido está incompleto e o objetivo do mé
 
         self.loss_fn = nn.CrossEntropyLoss()
 
-        self.optimizer = torch.optim.Adam(self.Cnn.parameters(), lr= 1e-3)
+        self.optimizer = torch.optim.SGD(self.Cnn.parameters(), lr= 1e-3)
 
     def __str__(self) -> str:
 
@@ -198,12 +198,12 @@ Observação: o trecho de código fornecido está incompleto e o objetivo do mé
             
             
             if writer:
-                writer.add_scalars(main_tag="Loss per Epoch",
+                writer.add_scalars(main_tag=f"Loss per epochs _{len(list(self.Cnn.children()))} Layers",
                                 tag_scalar_dict={"Test Loss": valid_loss},
                                 global_step=epoch)
 
                 # Add accuracy results to SummaryWriter
-                writer.add_scalars(main_tag="Accuracy per Epoch",
+                writer.add_scalars(main_tag=f"Accuracy per epochs _{len(list(self.Cnn.children()))} Layers",
                                 tag_scalar_dict={"Test Accuracy": test_accurary},
                                 global_step=epoch)
                 
@@ -374,14 +374,55 @@ A classe ConvBlock pode ser usada como um bloco de construção em uma rede neur
             nn.Conv1d(out_channels, out_channels,
                       kernel_size=2, padding=1, stride=1),
             nn.BatchNorm1d(out_channels),
+            nn.ReLU(),
+            nn.MaxPool1d(kernel_size=2),
+            nn.Conv1d(out_channels, out_channels,
+                      kernel_size=2, padding=1, stride=1),
+            nn.BatchNorm1d(out_channels),
             nn.Tanh(),
             nn.MaxPool1d(kernel_size=2)
         )
 
 
-        if conv_blocks == 4 : # 4 layer com 4 subcamadas
+        if conv_blocks >= 4 : # 4 layer com 4 subcamadas
 
             self.conv4 = nn.Sequential(
+            nn.Conv1d(out_channels, out_channels,
+                      kernel_size=2, padding=1, stride=1),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(),
+            nn.MaxPool1d(kernel_size=2),
+            nn.Conv1d(out_channels, out_channels,
+                      kernel_size=2, padding=1, stride=1),
+            nn.BatchNorm1d(out_channels),
+            nn.Tanh(),
+            nn.MaxPool1d(kernel_size=2)
+        )
+            
+        if conv_blocks >= 5 : # 5 layer com 4 subcamadas
+
+            self.conv5 = nn.Sequential(
+            nn.Conv1d(out_channels, out_channels,
+                      kernel_size=2, padding=1, stride=1),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(),
+            
+            nn.MaxPool1d(kernel_size=2),
+            nn.Conv1d(out_channels, out_channels,
+                      kernel_size=2, padding=1, stride=1),
+            nn.BatchNorm1d(out_channels),
+            nn.Tanh(),
+            nn.MaxPool1d(kernel_size=2)
+        )
+        if conv_blocks == 6 : # 5 layer com 4 subcamadas
+
+            self.conv6 = nn.Sequential(
+            nn.Conv1d(out_channels, out_channels,
+                      kernel_size=2, padding=1, stride=1),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(),
+            
+            nn.MaxPool1d(kernel_size=2),
             nn.Conv1d(out_channels, out_channels,
                       kernel_size=2, padding=1, stride=1),
             nn.BatchNorm1d(out_channels),
@@ -398,6 +439,10 @@ A classe ConvBlock pode ser usada como um bloco de construção em uma rede neur
             x = self.conv3(x)
         if hasattr(self, 'conv4'):
             x = self.conv4(x)
+        if hasattr(self, 'conv5'):
+            x = self.conv5(x)
+        if hasattr(self, 'conv6'):
+            x = self.conv6(x)
         return x
 
     @property
@@ -406,7 +451,7 @@ A classe ConvBlock pode ser usada como um bloco de construção em uma rede neur
     
     @conv_blocks.setter
     def conv_blocks(self, value):
-        if value < 0 or value > 4:
+        if value < 0 or value > 6:
             print("Erro: conv_blocks inserido maior do que 4. O valor padrão de 1 será usado.")
             self._conv_blocks = 1
         else:
@@ -514,38 +559,55 @@ O modelo classificador é projetado para obter dados de entrada com vários cana
 
 
 if __name__ == "__main__":
-    from helper_functions import train
+    from helper_functions import  create_writer , save_model
+    from torchmetrics import ConfusionMatrix
+    from mlxtend.plotting import plot_confusion_matrix
+    import random
 
     
-    input_size = [500, 1000 ,2000,4000]
+    input_size = [250,500,1000]
+
     for i in range(len(input_size)):
 
-        data = DATA_1M(seconds=40,columns=input_size[i], jump_time =2, n_jumps=3) ; data_fourier = data(Fourier=True, Normalizing= True)
+        data = DATA_1M(seconds=40,columns=input_size[i]) ; data_fourier = data(Fourier=True, Normalizing= True)
         
-        Torch = NeuralNetCNN(columns= data_fourier.shape[1] -1,conv_blocks =1,groupblocks=1)
+        Torch = NeuralNetCNN(columns= input_size[i] ,conv_blocks =6 ,groupblocks=3)
 
-        data.Spliting(data= data_fourier, random_state= 30, test_size = 0.25, shuffle = True, inplace= False)
+        data.Spliting(data= data_fourier, random_state= random.randint(10,100000), test_size = 0.275, shuffle = True, inplace= False)
 
-        train_dataloader , test_dataloader = data.DataLoaders(batch_size=64, inplace=False)
+        train_dataloader , test_dataloader = data.DataLoaders(batch_size=512, inplace=True)
 
-        writer = SummaryWriter(f"""
-                            Experiment Fourier- {data_fourier.shape[1]-1} 
-                            input size - {len(list(Torch.Cnn.children()))} Layers ,
-                            {Torch.count_blocks(Torch.Cnn)} Blocks
-                            """)
-        print(f""" Experiment Fourier- {data_fourier.shape[1]-1} 
-                           input size - {len(list(Torch.Cnn.children()))} Layers ,
-                           {Torch.count_blocks(Torch.Cnn)} Blocks
-                           """)
+        experiment_name = f"Fourier_{i}_{data_fourier.shape[1]-1}_inputsize_{len(list(Torch.Cnn.children()))}_Layers_{Torch.count_blocks(Torch.Cnn)}_Blocks"
+        
+        model_name = f"CNN_19TEP_Fourier_10_Layers_{i}"
 
-        train(model= Torch.Cnn,
-            train_dataloader= train_dataloader,
-            test_dataloader= test_dataloader,
+        print(f"Experiment Fourier:  {data_fourier.shape[1]-1} input size ,  {len(list(Torch.Cnn.children()))} Layers ,{Torch.count_blocks(Torch.Cnn)} Blocks")
+
+        
+        Torch.training_loop(model= Torch.Cnn,
+            data_loader_train= train_dataloader,
+            data_loader_test= test_dataloader,
             optimizer= Torch.optimizer,
             loss_fn= Torch.loss_fn,
             device= Torch.device,
-            writer= writer,
-            epochs= 20)
+            accuracy_fn= accuracy_fn,
+            writer= create_writer(experiment_name=experiment_name,
+                                model_name= model_name
+                                ),
+            epochs= 30)
+        ## Salvando o modelo
+        save_filepath = f"Model _{model_name}.pth"
+        save_model(model=Torch.Cnn,
+                target_dir="models",
+                model_name=save_filepath)
+        class_names =["CLEAR", "WIFI", "LTE"]
+        y_pred_tensor = Torch.Making_Predictions(model=Torch.Cnn,data_loader=test_dataloader)
+        
+        # Plot the confusion matrix
+        print(classification_report(data.y_test,y_pred_tensor,
+                                    target_names= class_names))
+        
+        Torch.print_confusion_matrix(y_pred= y_pred_tensor, y_true= data.y_test, num_classes= 3)
 
 # class CNNModel(nn.Module):
 

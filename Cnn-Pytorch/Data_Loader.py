@@ -37,27 +37,30 @@ class DATA_1M():
         jump_time_rows (int): Número de linhas calculado a partir do parâmetro de 'pulos'.
     """
 
-    def __init__(self, seconds, columns, jump_time, n_jumps) -> None:
+    def __init__(self, seconds, columns) -> None:
 
         self.sec = seconds  # numero de segundos que sera tomado/repartido do dataset
-        self.jump = jump_time  # valor em segundos que a função vai 'pular' o dataset
+
         self.values_reshaped = columns  # quantidade de colunas a ser feito reshapee
-        self.n_jumps = n_jumps  # quantidos de vezes que será 'pulado' o dataset
 
         data = ['Clear.npy', 'WIFI_1M.npy', 'LTE_1M.npy']
         self.signal = list(map(lambda x: (np.load(
             f"C:/Users/janathan.pena/Documents/GitHub/{x}")), data))  # Data load
 
-        self.clear = self.signal[0]
-        self.wifi = self.signal[1]
-        self.lte = self.signal[2]
+        
 
         # transformando os parametros de segundos para número de linhas
         self.row = int(
-            np.round((self.sec*(self.signal[0].shape[0]) / (60)) / columns)*columns)
+            np.round((self.sec*(self.signal[0].shape[0]) / (90)) / columns)*columns)
 
         # transformando os parametros de 'pulos' para número de linhas
-        self.jump_time_rows = int(self.jump * (self.signal[0].shape[0]) / (60))
+        
+        
+        self.clear_ = self.signal[0][: self.row]
+        self.wifi_ = self.signal[1][: self.row]
+        self.lte_ = self.signal[2][: self.row]
+        
+        self.sinais = [self.clear_, self.wifi_ ,self.lte_]
 
     def __str__(self) -> str:
 
@@ -173,9 +176,7 @@ class DATA_1M():
             Retorna o dateframe apos a Tranformada de Fourier.
             """
             empyt_list = []
-            empyt_list = list(map(lambda x: [np.fft.fftn(x[self.jump_time_rows:self.jump_time_rows+int(self.row/self.n_jumps)]) for i in range(self.n_jumps)],
-
-                                  self.signal))  # Aplicando a transformada de Fourier
+            empyt_list = list(map(lambda x: [np.fft.fftn(x)], self.sinais))  # Aplicando a transformada de Fourier
 
             # SEPARANDO REAL E IMAG
             clear, lte, wifi = map(lambda x:  np.concatenate((np.real(x).reshape(-1, 1), np.imag(
@@ -193,15 +194,14 @@ class DATA_1M():
             signal_list = list(map(lambda x: np.hstack(
                 x).reshape(-1, self.values_reshaped), samples_signal))
             # Reshaping data            # Slicing data
+            
+
         elif Fourier == False and Normalizing == True:
 
-            empyt_list = []
-            empyt_list = list(map(lambda x: [(x[self.jump_time_rows:self.jump_time_rows+int(self.row/self.n_jumps)]) for i in range(self.n_jumps)],
-
-                                  self.signal))  # Aplicando a transformada de Fourier
+ # Aplicando a transformada de Fourier
 
             clear, lte, wifi = map(lambda x:  np.concatenate((np.real(x).reshape(-1, 1), np.imag(
-                x).reshape(-1, 1)), axis=1), empyt_list[:3])  # Spliting the real and imaginary numbers
+                x).reshape(-1, 1)), axis=1), self.sinais[:3])  # Spliting the real and imaginary numbers
 
             clear = normalize(data=clear)
             lte = normalize(data=lte)
@@ -211,21 +211,24 @@ class DATA_1M():
 
             signal_list = list(map(lambda x: np.hstack(
                 x).reshape(-1, self.values_reshaped), samples_signal))
+            
+
 
         elif Fourier == True and Normalizing == False:
 
             empyt_list = []
-            empyt_list = list(map(lambda x: [np.fft.fftn(x[self.jump_time_rows:self.jump_time_rows+int(self.row/self.n_jumps)]) for i in range(self.n_jumps)],
+            empyt_list = list(map(lambda x: [np.fft.fftn(x)], self.sinais))  # Aplicando a transformada de Fourier
 
-                                  self.signal))  # Aplicando a transformada de Fourier
-
+            # SEPARANDO REAL E IMAG
             clear, lte, wifi = map(lambda x:  np.concatenate((np.real(x).reshape(-1, 1), np.imag(
-                x).reshape(-1, 1)), axis=1), empyt_list[:3])  # Spliting the real and imaginary numbers
+                x).reshape(-1, 1)), axis=1), empyt_list[:3]) # Spliting the real and imaginary numbers
 
             samples_signal = [clear, lte, wifi]
 
             signal_list = list(map(lambda x: np.hstack(
-                x).reshape(-1, self.values_reshaped), samples_signal))    # Slicing data
+                x).reshape(-1, self.values_reshaped), samples_signal))  
+            
+# Slicing data
 
         # Creating labels  0 - CLEAR , 1 - WIFI - 2 LTE
         result = []

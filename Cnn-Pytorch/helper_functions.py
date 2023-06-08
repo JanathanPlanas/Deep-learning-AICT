@@ -72,27 +72,27 @@ def save_model(model: torch.nn.Module,
 def create_writer(experiment_name: str, 
                   model_name: str, 
                   extra: str=None) -> torch.utils.tensorboard.writer.SummaryWriter():
-    """Creates a torch.utils.tensorboard.writer.SummaryWriter() instance saving to a specific log_dir.
+    """Cria uma instância do arch.utils.tensorboard.writer.SummaryWriter() salvando em um log_dir específico.
 
-    log_dir is a combination of runs/timestamp/experiment_name/model_name/extra.
+     log_dir é uma combinação de runs/timestamp/experiment_name/model_name/extra.
 
-    Where timestamp is the current date in YYYY-MM-DD format.
+     Onde timestamp é a data atual no formato AAAA-MM-DD.
 
-    Args:
-        experiment_name (str): Name of experiment.
-        model_name (str): Name of model.
-        extra (str, optional): Anything extra to add to the directory. Defaults to None.
+     Argumentos:
+         experiment_name (str): Nome do experimento.
+         model_name (str): Nome do modelo.
+         extra (str, opcional): Qualquer coisa extra para adicionar ao diretório. O padrão é Nenhum.
 
-    Returns:
-        torch.utils.tensorboard.writer.SummaryWriter(): Instance of a writer saving to log_dir.
+     Retorna:
+         archote.utils.tensorboard.writer.SummaryWriter(): Instância de um gravador salvando em log_dir.
 
-    Example usage:
-        # Create a writer saving to "runs/2022-06-04/data_10_percent/effnetb2/5_epochs/"
-        writer = create_writer(experiment_name="data_10_percent",
-                               model_name="effnetb2",
-                               extra="5_epochs")
-        # The above is the same as:
-        writer = SummaryWriter(log_dir="runs/2022-06-04/data_10_percent/effnetb2/5_epochs/")
+     Exemplo de uso:
+         # Crie um gravador salvando em "runs/2022-06-04/data_10_percent/effnetb2/5_epochs/"
+         escritor = create_writer(experiment_name="data_10_percent",
+                                model_name="effnetb2",
+                                extra="5_épocas")
+         # O acima é o mesmo que:
+         Writer = SummaryWriter(log_dir="runs/2022-06-04/data_10_percent/effnetb2/5_epochs/")
     """
     from datetime import datetime
     import os
@@ -269,7 +269,8 @@ def train(model: torch.nn.Module,
           loss_fn: torch.nn.Module,
           epochs: int,
           device: torch.device,
-          writer: torch.utils.tensorboard.writer.SummaryWriter) -> Dict[str, List]:
+          writer: torch.utils.tensorboard.writer.SummaryWriter,
+          columns: int) -> Dict[str, List]:
     """Treina e testa um modelo PyTorch.
 
      Passa um modelo PyTorch de destino por meio de train_step() e test_step()
@@ -348,7 +349,7 @@ def train(model: torch.nn.Module,
             # Track the PyTorch model architecture
             writer.add_graph(model=model,
                              # Pass in an example input
-                             input_to_model=torch.randn(8, 2000, 1).to(device).double())
+                             input_to_model=torch.randn(8, columns, 1).to(device).double())
             
 
             # Close the writer
