@@ -15,29 +15,61 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class DATA_1M():
 
-    def __init__(self, seconds, columns, jump_time, n_jumps) -> None:
+    """
+    Classe para manipulação de dados do dataset 1M.
+
+    Args:
+        seconds (int): Número de segundos a serem tomados/repartidos do dataset.
+        columns (int): Quantidade de colunas a serem feitas no reshape.
+        jump_time (int): Valor em segundos que a função vai 'pular' o dataset.
+        n_jumps (int): Quantidade de vezes que será 'pulado' o dataset.
+
+    Attributes:
+        sec (int): Número de segundos que será tomado/repartido do dataset.
+        jump (int): Valor em segundos que a função vai 'pular' o dataset.
+        values_reshaped (int): Quantidade de colunas a serem feitas no reshape.
+        n_jumps (int): Quantidade de vezes que será 'pulado' o dataset.
+        signal (list): Lista contendo os dados dos sinais carregados a partir de arquivos.
+        clear (ndarray): Dados do sinal 'Clear'.
+        wifi (ndarray): Dados do sinal 'WIFI_1M'.
+        lte (ndarray): Dados do sinal 'LTE_1M'.
+        row (int): Número de linhas calculado a partir dos parâmetros de segundos e colunas.
+        jump_time_rows (int): Número de linhas calculado a partir do parâmetro de 'pulos'.
+    """
+
+    def __init__(self, seconds, columns) -> None:
 
         self.sec = seconds  # numero de segundos que sera tomado/repartido do dataset
-        self.jump = jump_time  # valor em segundos que a função vai 'pular' o dataset
+
         self.values_reshaped = columns  # quantidade de colunas a ser feito reshapee
-        self.n_jumps = n_jumps  # quantidos de vezes que será 'pulado' o dataset
 
         data = ['Clear.npy', 'WIFI_1M.npy', 'LTE_1M.npy']
         self.signal = list(map(lambda x: (np.load(
-            f"C:/Users/janat/OneDrive/Documentos/GitHub/Data_/{x}")), data))  # Data load
+            f"C:/Users/janathan.pena/Documents/GitHub/{x}")), data))  # Data load
 
-        self.clear = self.signal[0]
-        self.wifi = self.signal[1]
-        self.lte = self.signal[2]
+        
 
         # transformando os parametros de segundos para número de linhas
         self.row = int(
-            np.round((self.sec*(self.signal[0].shape[0]) / (60)) / columns)*columns)
+            np.round((self.sec*(self.signal[0].shape[0]) / (90)) / columns)*columns)
 
         # transformando os parametros de 'pulos' para número de linhas
-        self.jump_time_rows = int(self.jump * (self.signal[0].shape[0]) / (60))
+        
+        
+        self.clear_ = self.signal[0][: self.row]
+        self.wifi_ = self.signal[1][: self.row]
+        self.lte_ = self.signal[2][: self.row]
+        
+        self.sinais = [self.clear_, self.wifi_ ,self.lte_]
 
     def __str__(self) -> str:
+
+        """
+        Retorna uma representação em string dos parâmetros da classe.
+
+        Returns:
+            str: Representação em string dos parâmetros da classe.
+        """
         return f"Número de linhas {self.row}, equivalente a {self.sec} segundos \n Pulando em {self.jump} segundos em {self.n_jumps} vezes"
 
     def __setitem__(self, value):
@@ -47,16 +79,46 @@ class DATA_1M():
     # objeto Call usado para escolher se o dataset terá ou não transformada de Fourier
 
     def get_clear(self):
+        """
+        Retorna o atributo 'clear'.
 
+        Returns:
+            numpy.ndarray: O array 'clear'.
+        """
         return self.clear
 
     def get_wifi(self):
+        """
+        Retorna o atributo 'wifi'.
+
+        Returns:
+            numpy.ndarray: O array 'wifi'.
+        """
         return self.wifi
 
     def get_lte(self):
+        """
+        Retorna o atributo 'lte'.
+
+        Returns:
+            numpy.ndarray: O array 'lte'.
+        """
         return self.lte
 
+    
+
     def __getattribute__(self, item):
+
+        """
+        Sobrescreve o método __getattribute__ para imprimir informações sobre os atributos 'clear', 'wifi' e 'lte'
+        quando eles forem acessados.
+
+        Args:
+            item (str): Nome do atributo a ser acessado.
+
+        Returns:
+            O valor do atributo, se for diferente de 'clear', 'wifi' ou 'lte'.
+        """
         if item == 'clear':
             print(
                 """shape array {},\n
@@ -97,15 +159,24 @@ class DATA_1M():
 
     def __call__(self, Fourier=False, Normalizing=False):
 
+        """
+        Retorna o dataframe após aplicar a Transformada de Fourier e/ou a normalização nos dados.
+
+        Args:
+            Fourier (bool, optional): Indica se a Transformada de Fourier deve ser aplicada. O padrão é False.
+            Normalizing (bool, optional): Indica se a normalização deve ser aplicada. O padrão é False.
+
+        Returns:
+            numpy.ndarray: O dataframe resultante.
+        """
+
         if Fourier == True and Normalizing == True:
 
             """
             Retorna o dateframe apos a Tranformada de Fourier.
             """
             empyt_list = []
-            empyt_list = list(map(lambda x: [np.fft.fftn(x[self.jump_time_rows:self.jump_time_rows+int(self.row/self.n_jumps)]) for i in range(self.n_jumps)],
-
-                                  self.signal))  # Aplicando a transformada de Fourier
+            empyt_list = list(map(lambda x: [np.fft.fftn(x)], self.sinais))  # Aplicando a transformada de Fourier
 
             # SEPARANDO REAL E IMAG
             clear, lte, wifi = map(lambda x:  np.concatenate((np.real(x).reshape(-1, 1), np.imag(
@@ -119,18 +190,18 @@ class DATA_1M():
             samples_signal = [clear, lte, wifi]
 
             # RESHAPE DOS DADOS
+            
             signal_list = list(map(lambda x: np.hstack(
                 x).reshape(-1, self.values_reshaped), samples_signal))
             # Reshaping data            # Slicing data
+            
+
         elif Fourier == False and Normalizing == True:
 
-            empyt_list = []
-            empyt_list = list(map(lambda x: [(x[self.jump_time_rows:self.jump_time_rows+int(self.row/self.n_jumps)]) for i in range(self.n_jumps)],
-
-                                  self.signal))  # Aplicando a transformada de Fourier
+ # Aplicando a transformada de Fourier
 
             clear, lte, wifi = map(lambda x:  np.concatenate((np.real(x).reshape(-1, 1), np.imag(
-                x).reshape(-1, 1)), axis=1), empyt_list[:3])  # Spliting the real and imaginary numbers
+                x).reshape(-1, 1)), axis=1), self.sinais[:3])  # Spliting the real and imaginary numbers
 
             clear = normalize(data=clear)
             lte = normalize(data=lte)
@@ -140,21 +211,24 @@ class DATA_1M():
 
             signal_list = list(map(lambda x: np.hstack(
                 x).reshape(-1, self.values_reshaped), samples_signal))
+            
+
 
         elif Fourier == True and Normalizing == False:
 
             empyt_list = []
-            empyt_list = list(map(lambda x: [np.fft.fftn(x[self.jump_time_rows:self.jump_time_rows+int(self.row/self.n_jumps)]) for i in range(self.n_jumps)],
+            empyt_list = list(map(lambda x: [np.fft.fftn(x)], self.sinais))  # Aplicando a transformada de Fourier
 
-                                  self.signal))  # Aplicando a transformada de Fourier
-
+            # SEPARANDO REAL E IMAG
             clear, lte, wifi = map(lambda x:  np.concatenate((np.real(x).reshape(-1, 1), np.imag(
-                x).reshape(-1, 1)), axis=1), empyt_list[:3])  # Spliting the real and imaginary numbers
+                x).reshape(-1, 1)), axis=1), empyt_list[:3]) # Spliting the real and imaginary numbers
 
             samples_signal = [clear, lte, wifi]
 
             signal_list = list(map(lambda x: np.hstack(
-                x).reshape(-1, self.values_reshaped), samples_signal))    # Slicing data
+                x).reshape(-1, self.values_reshaped), samples_signal))  
+            
+# Slicing data
 
         # Creating labels  0 - CLEAR , 1 - WIFI - 2 LTE
         result = []
@@ -181,6 +255,22 @@ class DATA_1M():
         return np.concatenate(result, axis=0)
 
     def Spliting(self, data: np.ndarray, random_state, test_size, shuffle: bool, inplace: bool):
+
+
+        """
+        Realiza a divisão dos dados em conjunto de treinamento e teste.
+
+        Args:
+            data (np.ndarray): O dataframe a ser dividido.
+            random_state: O valor de semente aleatória para reprodução dos resultados.
+            test_size: A proporção do conjunto de teste em relação ao conjunto total.
+            shuffle (bool): Indica se os dados devem ser embaralhados antes da divisão.
+            inplace (bool): Indica se os conjuntos divididos devem substituir os atributos da classe ou serem retornados.
+
+        Returns:
+            tuple: Uma tupla contendo os conjuntos de treinamento e teste, respectivamente.
+
+        """
 
         X = data[:, :-1]
         y = data[:, -1]
@@ -225,6 +315,18 @@ class DATA_1M():
         # convertendo numpy arrays em tensores do PyTorch
     def DataLoaders(self, batch_size, inplace: bool):
 
+        """
+        Cria os dataloaders para o conjunto de treinamento e teste.
+
+        Args:
+            batch_size: O tamanho de lote para cada iteração do dataloader.
+            inplace (bool): Indica se os dataloaders criados devem substituir os atributos da classe ou serem retornados.
+
+        Returns:
+            tuple: Uma tupla contendo os dataloaders de treinamento e teste, respectivamente.
+
+        """ 
+
         # criando datasets
         self.train_dataset = TensorDataset(self.X_train, self.y_train)
         self.test_dataset = TensorDataset(self.X_test, self.y_test)
@@ -251,11 +353,3 @@ class DATA_1M():
         else:
             pass
 
-
-# if __name__ == "__main__":
-
-#      import pandas as pd
-
-#      # Criando o objeto com os parâmetros
-#      model =  DATA_1M(seconds= 20 ,columns=2000, jump_time =0 , n_jumps=1)
-#      print(pd.DataFrame(model.loading_data()))
