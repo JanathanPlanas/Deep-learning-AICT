@@ -221,60 +221,41 @@ O modelo classificador é projetado para obter dados de entrada com vários cana
                 nn.LogSoftmax(dim=1)
             )
 
-
 class CNNModel(nn.Module):
 
-    def __init__(self, in_channels):
+    def __init__(self, in_channels, out_channels):
         super(CNNModel, self).__init__()
         self.layer1 = nn.Sequential(
-            nn.Conv1d(in_channels=in_channels,
-                      out_channels=32,
-                      kernel_size=2,
-                      padding=1, stride=1),
-
-            nn.BatchNorm1d(32),
-
-            nn.Conv1d(in_channels=32,
-                      out_channels=64,
-                      kernel_size=2,
-                      padding=1, stride=1),
-
-            nn.MaxPool1d(kernel_size=2, stride=3))
-
-        self.layer2 = nn.Sequential(
-            nn.Conv1d(in_channels=64,
-                      out_channels=32,
-                      kernel_size=2,
-                      padding=1, stride=1),
-
-            nn.BatchNorm1d(32),
-
-            nn.Conv1d(in_channels=32,
-                      out_channels=16,
-                      kernel_size=2,
-                      padding=1, stride=1),
-            nn.MaxPool1d(kernel_size=2, stride=3))
-
-        self.classifier = nn.Sequential(
-
-            nn.BatchNorm1d(16),
+            nn.Conv1d(in_channels, 16, kernel_size=2, padding=1, stride=1),
             nn.ReLU(),
-            nn.LogSoftmax(dim=1)
-
-
+            nn.Conv1d(16, 24, kernel_size=2, padding=1, stride=1),
+            nn.MaxPool1d(kernel_size=2, stride=3)
         )
 
-    def forward(self, x):
+        self.layer2 = nn.Sequential(
+            nn.Conv1d(24, 16, kernel_size=2, padding=1, stride=1),
+            nn.ReLU(),
+            nn.Conv1d(16, out_channels, kernel_size=2, padding=1, stride=1),
+            nn.MaxPool1d(kernel_size=2, stride=3)
+        )
 
+         
+        self.classifier = nn.Sequential(
+        # #     nn.ReLU(), # Ajuste a dimensão de saída para corresponder ao número de colunas "blockage"
+        # #     nn.LogSoftmax(dim=1)
+                nn.Dropout1d(0.2),
+                nn.ReLU()
+          )
+
+    def forward(self, x):
         out = self.layer1(x)
         out = self.layer2(out)
-
         out = out.view(out.size(0), -1)
         out = self.classifier(out)
-
-        out = nn.functional.softmax(out, dim=1)
-
+        # out = nn.functional.softmax(out, dim=1)
+        out = nn.functional.sigmoid(out)
         return out
+
 
 
 # class CNNModel(nn.Module):

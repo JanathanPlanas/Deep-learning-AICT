@@ -15,7 +15,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def normalize(data):
 
-    scaler = StandardScaler()
+    scaler = MinMaxScaler()
     scaler.fit(data)
 
     return scaler.transform(data)
@@ -23,7 +23,11 @@ def normalize(data):
 
 class Loaders():
 
-    def __init__(self, batch_size: int, normalization: bool, file_path='future_clean/future-1/') -> None:
+    def __init__(self, 
+                 normalization: bool, 
+                 dimension :int ,
+                 file_path='future_clean/future-1/',
+                 batch_size = None) -> None:
 
         self.normalize = normalization
 
@@ -40,26 +44,28 @@ class Loaders():
         self.test = (data_dict['test'])
 
         if normalization == True:
-            X_train = normalize(self.train[:, :-1])
-            y_train = self.train[:, -1]
-            X_test = normalize(self.test[:, :-1])
-            y_test = self.test[:, -1]
-            X_val = normalize(self.val[:, :-1])
-            y_val = self.val[:, -1]
+            X_train = normalize(self.train[:, :-dimension])
+            y_train = self.train[:, -dimension:]
+            X_test = normalize(self.test[:, :-dimension])
+            y_test = self.test[:, -dimension:]
+            X_val = normalize(self.val[:, :-dimension])
+            y_val = self.val[:, -dimension]
 
         if normalization == False:
-            X_train = (self.train[:, :-1])
-            y_train = self.train[:, -1]
-            X_test = (self.test[:, :-1])
-            y_test = self.test[:, -1]
-            X_val = (self.val[:, :-1])
-            y_val = self.val[:, -1]
+            X_train = (self.train[:, :-dimension])
+            y_train = self.train[:, -dimension]
+            X_test = (self.test[:, :-dimension])
+            y_test = self.test[:, -dimension]
+            X_val = (self.val[:, :-dimension])
+            y_val = self.val[:, -dimension]
+
 
         numpy_list = [X_train, y_train, X_val, y_val, X_test, y_test]
         tensor_list = []
+        self.numpy_list = numpy_list
 
         for npy in numpy_list:
-            tensor = torch.Tensor(npy).to(device, dtype=torch.float64)
+            tensor = torch.Tensor(npy).to(device, dtype=torch.double)
             tensor_list.append(tensor)
 
         X_train_tensor, y_train_tensor, X_val_tensor, y_val_tensor, X_test_tensor, y_test_tensor = tensor_list
