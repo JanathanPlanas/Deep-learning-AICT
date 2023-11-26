@@ -70,18 +70,17 @@ class Loaders():
 
         X_train_tensor, y_train_tensor, X_val_tensor, y_val_tensor, X_test_tensor, y_test_tensor = tensor_list
 
-        datasets = [train_dataset, val_dataset, test_dataset] = [
+        datasets = [train_dataset, test_dataset] = [
             TensorDataset(X_train_tensor, y_train_tensor),
-            TensorDataset(X_val_tensor, y_val_tensor),
             TensorDataset(X_test_tensor, y_test_tensor)
         ]
 
-        loaders = [train_loader, val_loader, test_loader] = [
+        loaders = [train_loader, test_loader] = [
             DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-            for dataset, shuffle in zip(datasets, [True, False, True])
+            for dataset, shuffle in zip(datasets, [True, True])
         ]
 
-        self.train_loader, self.val_loader, self.test_loader = loaders
+        self.train_loader , self.test_loader = loaders
 
     def __setitem__(self, value):
 
